@@ -337,8 +337,9 @@ class TestRenderMode:
         result = fmt_p(3.8e-4)
         assert "\\times" in result
         assert "10^{" in result
-        assert result.startswith("$")
-        assert result.endswith("$")
+        # No $...$ wrapping — template controls math delimiters
+        assert not result.startswith("$")
+        assert not result.endswith("$")
 
     def test_fmt_p_latex_moderate_p_unchanged(self):
         """Moderate p-values (>= 0.001) are not affected by render mode."""
@@ -354,15 +355,31 @@ class TestRenderMode:
     def test_fmt_r_latex_mode(self):
         set_render_mode("latex")
         result = fmt_r(-0.45)
-        assert result == "$-0.45$"
+        # ASCII minus, no $...$ wrapping
+        assert result == "-0.45"
 
     def test_fmt_r_latex_positive_with_sign(self):
         set_render_mode("latex")
         result = fmt_r(0.32, sign=True)
-        assert result == "$+0.32$"
+        assert result == "+0.32"
 
     def test_fmt_r_latex_positive_no_sign(self):
         set_render_mode("latex")
         result = fmt_r(0.32, sign=False)
-        assert result == "$0.32$"
+        assert result == "0.32"
+
+    def test_fmt_r_latex_in_math_context(self):
+        """Verify that LaTeX mode output works naturally in $...$ context."""
+        set_render_mode("latex")
+        # Simulating what the template does: $r = {{x:r}}$
+        r_val = fmt_r(-0.45)
+        rendered = f"$r = {r_val}$"
+        assert rendered == "$r = -0.45$"  # Clean, no double $
+
+    def test_fmt_p_latex_in_math_context(self):
+        """Verify small p-value in $...$ context."""
+        set_render_mode("latex")
+        p_val = fmt_p(3.8e-4)
+        rendered = f"$p = {p_val}$"
+        assert "$$" not in rendered  # No nested delimiters
 

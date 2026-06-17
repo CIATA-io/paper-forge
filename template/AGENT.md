@@ -133,8 +133,16 @@ you'll get `++0.32`. Use one or the other:
 
 paper-forge auto-detects whether to use Unicode or LaTeX formatting based on
 your `project.yaml` rendering engine. If `--pdf-engine=xelatex` (or similar) is
-configured, small p-values will produce `$3.8 \times 10^{-4}$` (LaTeX math)
-instead of `3.8×10⁻⁴` (Unicode superscripts).
+configured, formatters produce LaTeX-compatible output (ASCII minus, `\times`
+notation) instead of Unicode (`−`, `×10⁻⁴`).
+
+Formatters **do not** add `$...$` delimiters — you control math mode in the
+template:
+
+```markdown
+$r = {{stats.corr:r}}$         →  $r = -0.45$
+$p = {{stats.p_value:p}}$      →  $p = 3.8 \times 10^{-4}$
+```
 
 ## Workflow Commands
 

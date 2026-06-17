@@ -216,11 +216,20 @@ make pipeline
 
 paper-forge auto-detects whether to use **Unicode** or **LaTeX** formatting
 based on your rendering engine. If your `project.yaml` includes
-`--pdf-engine=xelatex` (or similar LaTeX engine), small p-values will produce
-`$3.8 \times 10^{-4}$` instead of `3.8×10⁻⁴`, and `:r` values will be wrapped
-in `$...$` for proper minus signs.
+`--pdf-engine=xelatex` (or similar LaTeX engine):
 
-You can also set it manually:
+- Small p-values produce `3.8 \times 10^{-4}` instead of `3.8×10⁻⁴`
+- Effect sizes use ASCII minus (`-0.45`) instead of Unicode minus (`−0.45`)
+
+Formatters **do not** add `$...$` delimiters — you control math mode in the
+template as usual:
+
+```markdown
+$r = {{stats.corr:r}}$           →  $r = -0.45$
+$p = {{stats.p_value:p}}$        →  $p = 3.8 \times 10^{-4}$
+```
+
+You can also set the mode manually:
 ```python
 from paper_forge import set_render_mode
 set_render_mode("latex")   # or "unicode" (default)

@@ -74,7 +74,12 @@ def fmt_p(p: float | None) -> str:
     on the render mode:
 
     - ``"unicode"``: ``'4.5×10⁻¹⁷'`` (Unicode superscripts)
-    - ``"latex"``: ``'$4.5 \\times 10^{-17}$'`` (LaTeX math)
+    - ``"latex"``: ``'4.5 \\times 10^{-17}'`` (LaTeX notation, no ``$`` delimiters)
+
+    In LaTeX mode the output does **not** include ``$...$`` delimiters so
+    that template authors can wrap placeholders in math mode naturally::
+
+        $p = {{stats.p_value:p}}$   →   $p = 3.8 \times 10^{-4}$
 
     Args:
         p: The p-value to format.
@@ -104,7 +109,7 @@ def fmt_p(p: float | None) -> str:
     exp = math.floor(math.log10(abs(p)))
     mantissa = p / (10**exp)
     if _RENDER_MODE == "latex":
-        return f"${mantissa:.1f} \\times 10^{{{exp}}}$"
+        return f"{mantissa:.1f} \\times 10^{{{exp}}}"
     exp_str = str(exp).translate(_SUPERSCRIPT_DIGITS)
     return f"{mantissa:.1f}×10{exp_str}"
 
@@ -143,7 +148,10 @@ def fmt_r(r: float | None, sign: bool = True) -> str:
     """Format an effect size (correlation coefficient).
 
     Uses Unicode minus sign for negative values and rounds to 2 decimal places.
-    In ``"latex"`` render mode, wraps the output in ``$...$`` math delimiters.
+    In ``"latex"`` render mode, uses ASCII minus (no ``$`` delimiters) so
+    that template authors can wrap placeholders in math mode naturally::
+
+        $r = {{stats.corr:r}}$   →   $r = -0.45$
 
     Args:
         r: The effect size / correlation coefficient.
@@ -173,15 +181,16 @@ def fmt_r(r: float | None, sign: bool = True) -> str:
     r = float(r)
     abs_val = f"{abs(r):.2f}"
     if _RENDER_MODE == "latex":
+        # Use ASCII minus, no $...$ — template controls math delimiters
         if not sign:
             if r < 0:
-                return f"$-{abs_val}$"
-            return f"${abs_val}$"
+                return f"-{abs_val}"
+            return abs_val
         if r < 0:
-            return f"$-{abs_val}$"
+            return f"-{abs_val}"
         if r > 0:
-            return f"$+{abs_val}$"
-        return "$0.00$"
+            return f"+{abs_val}"
+        return "0.00"
     if not sign:
         if r < 0:
             return f"{_UNICODE_MINUS}{abs_val}"
