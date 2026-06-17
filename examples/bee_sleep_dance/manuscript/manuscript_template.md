@@ -9,8 +9,8 @@ abstract: |
   accuracy in honeybees (Apis mellifera). A total of {{pop.n_total:int}} bees
   from {{pop.n_colonies:int}} colonies were assigned to sleep-deprived
   (n = {{pop.n_deprived:int}}) or control (n = {{pop.n_control:int}}) conditions.
-  Sleep-deprived bees showed {{pop.mean_error_deprived:fmt1}}° ± {{pop.sd_error_deprived:fmt1}}°
-  mean dance error compared to {{pop.mean_error_control:fmt1}}° ± {{pop.sd_error_control:fmt1}}°
+  Sleep-deprived bees showed {{pop.mean_error_deprived:f1}}° ± {{pop.sd_error_deprived:f1}}°
+  mean dance error compared to {{pop.mean_error_control:f1}}° ± {{pop.sd_error_control:f1}}°
   in controls ({{pop.dance_p:p}}, r = {{pop.dance_r:r}}).
   {{pop.dance_interp}}
 ---
@@ -46,9 +46,9 @@ across {{temp.n_observations:int}} observation sessions.
 
 ## Population-Level Effects
 
-Sleep-deprived bees (Mdn = {{pop.median_error_deprived:fmt1}}°) showed
-larger dance errors than controls (Mdn = {{pop.median_error_control:fmt1}}°;
-U = {{pop.dance_u:fmt1}}, {{pop.dance_p:p}}, r = {{pop.dance_r:r}}).
+Sleep-deprived bees (Mdn = {{pop.median_error_deprived:f1}}°) showed
+larger dance errors than controls (Mdn = {{pop.median_error_control:f1}}°;
+U = {{pop.dance_u:f1}}, {{pop.dance_p:p}}, r = {{pop.dance_r:r}}).
 {{pop.dance_interp}}
 
 {{pop.mass_interp}}
@@ -56,10 +56,10 @@ U = {{pop.dance_u:fmt1}}, {{pop.dance_p:p}}, r = {{pop.dance_r:r}}).
 ## Temporal Patterns
 
 The sleep deprivation effect was stronger in morning sessions
-(M = {{temp.mean_effect_morning:fmt1}}° ± {{temp.sd_effect_morning:fmt1}}°)
+(M = {{temp.mean_effect_morning:f1}}° ± {{temp.sd_effect_morning:f1}}°)
 than afternoon sessions
-(M = {{temp.mean_effect_afternoon:fmt1}}° ± {{temp.sd_effect_afternoon:fmt1}}°;
-U = {{temp.temporal_u:fmt1}}, {{temp.temporal_p:p}}, r = {{temp.temporal_r:r}}).
+(M = {{temp.mean_effect_afternoon:f1}}° ± {{temp.sd_effect_afternoon:f1}}°;
+U = {{temp.temporal_u:f1}}, {{temp.temporal_p:p}}, r = {{temp.temporal_r:r}}).
 {{temp.temporal_interp}}
 
 Additionally, dance error was correlated with time since waking

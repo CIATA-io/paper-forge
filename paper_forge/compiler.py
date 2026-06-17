@@ -43,11 +43,31 @@ _PLACEHOLDER_RE = re.compile(r"\{\{([^{}]+)\}\}")
 def load_project_config(path: str | Path) -> dict[str, Any]:
     """Load and validate a project configuration YAML file.
 
+    Supports two config formats:
+
+    **Flat format** (simple)::
+
+        manuscript: manuscript_template.md
+        output: manuscript.md
+        results_dir: results/
+
+    **Nested format** (recommended)::
+
+        manuscript:
+          template: manuscript/manuscript_template.md
+          output_md: manuscript/manuscript.md
+          results_dir: manuscript/results
+        result_units:
+          prefix_map:
+            "01_stats": "stats"
+
+    The nested format is normalized to flat keys internally.
+
     Args:
         path: Path to the project.yaml file.
 
     Returns:
-        Parsed configuration dictionary.
+        Normalized configuration dictionary with flat keys.
 
     Raises:
         FileNotFoundError: If the config file does not exist.
@@ -62,6 +82,22 @@ def load_project_config(path: str | Path) -> dict[str, Any]:
 
     if not isinstance(config, dict):
         raise ValueError(f"Project config {path} must be a YAML mapping")
+
+    # Normalize nested format to flat format
+    if "manuscript" in config and isinstance(config["manuscript"], dict):
+        ms = config["manuscript"]
+        config["manuscript"] = ms.get("template", "manuscript_template.md")
+        config["output"] = ms.get("output_md", "manuscript.md")
+        config["results_dir"] = ms.get("results_dir", "results/")
+        config.setdefault("figures_dir", ms.get("figures_dir", "figures/"))
+
+    if "result_units" in config and isinstance(config["result_units"], dict):
+        ru = config.pop("result_units")
+        if "prefix_map" in ru:
+            config["prefix_map"] = ru["prefix_map"]
+
+    if "rendering" in config and isinstance(config["rendering"], dict):
+        config["render"] = config.pop("rendering")
 
     required = ["manuscript", "output", "results_dir"]
     missing = [k for k in required if k not in config]
@@ -79,17 +115,17 @@ def load_all_results(
 ) -> dict[str, Any]:
     """Load all result JSONs and flatten into a prefix.key → value mapping.
 
-    If a ``prefix_map`` is provided, it maps prefixes to JSON filenames::
+    If a ``prefix_map`` is provided, it maps JSON filenames to prefixes::
 
         prefix_map:
-          stats: analysis_results    # stats.* → analysis_results.json
-          demo: demographics         # demo.* → demographics.json
+          "01_population": "pop"     # 01_population.json → pop.*
+          "02_analysis": "analysis"  # 02_analysis.json → analysis.*
 
     Without a prefix_map, the JSON filename stem is used as the prefix.
 
     Args:
         results_dir: Directory containing result JSON files.
-        prefix_map: Optional mapping of prefix → JSON filename (without .json).
+        prefix_map: Optional mapping of JSON filename stem → prefix.
 
     Returns:
         Flat dictionary mapping ``"prefix.key"`` to values.
@@ -97,9 +133,10 @@ def load_all_results(
     raw = load_results(results_dir)
     flat: dict[str, Any] = {}
 
-    # Build reverse map: json_stem → prefix
+    # prefix_map is stem → prefix (same format as project.yaml)
+    stem_to_prefix: dict[str, str]
     if prefix_map:
-        stem_to_prefix: dict[str, str] = {v: k for k, v in prefix_map.items()}
+        stem_to_prefix = dict(prefix_map)
     else:
         stem_to_prefix = {stem: stem for stem in raw}
 

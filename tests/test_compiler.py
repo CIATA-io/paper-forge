@@ -75,8 +75,8 @@ def project_dir(tmp_path: Path, results_dir: Path) -> Path:
         "output": "compiled.md",
         "results_dir": "results/",
         "prefix_map": {
-            "stats": "analysis",
-            "demo": "demographics",
+            "analysis": "stats",
+            "demographics": "demo",
         },
     }
     import yaml
@@ -138,7 +138,7 @@ class TestLoadAllResults:
         assert flat["demographics.n_participants"] == 50
 
     def test_with_prefix_map(self, results_dir: Path):
-        prefix_map = {"stats": "analysis", "demo": "demographics"}
+        prefix_map = {"analysis": "stats", "demographics": "demo"}
         flat = load_all_results(results_dir, prefix_map)
         assert "stats.n_samples" in flat
         assert flat["stats.n_samples"] == 150
