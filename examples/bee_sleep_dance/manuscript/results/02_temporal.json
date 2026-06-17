@@ -1,0 +1,29 @@
+{
+  "unit_name": "02_temporal",
+  "generated_at": "2026-06-15T10:31:00Z",
+  "provenance": {
+    "git_hash": "abc123def456",
+    "git_dirty": false,
+    "script_path": "scripts/result_units/02_temporal.py",
+    "script_hash": "sha256:example_hash_temporal"
+  },
+  "results": {
+    "n_morning": 38,
+    "n_afternoon": 35,
+    "n_observations": 73,
+
+    "mean_effect_morning": 8.72,
+    "sd_effect_morning": 3.95,
+    "mean_effect_afternoon": 4.18,
+    "sd_effect_afternoon": 3.41,
+    "temporal_u": 932.0,
+    "temporal_p": 0.00038,
+    "temporal_r": 0.398,
+    "temporal_interp": "The effect of sleep deprivation on dance accuracy was significantly stronger in morning observations compared to afternoon observations, suggesting partial recovery of dance communication over the course of the day.",
+
+    "correlation_rho": 0.412,
+    "correlation_p": 0.0031,
+    "correlation_interp": "Dance error was positively correlated with hours since waking (ρ = 0.412), indicating progressive deterioration of dance accuracy with extended wakefulness.",
+    "n_correlation": 50
+  }
+}

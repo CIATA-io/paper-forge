@@ -1,0 +1,25 @@
+project:
+  name: "bee-sleep-dance"
+  title: "Sleep Deprivation Effects on Honeybee Dance Communication"
+
+manuscript:
+  template: "manuscript/manuscript_template.md"
+  output_md: "manuscript/manuscript.md"
+  output_pdf: "manuscript/manuscript.pdf"
+  results_dir: "manuscript/results"
+  figures_dir: "manuscript/figures"
+
+result_units:
+  prefix_map:
+    "01_population": "pop"
+    "02_temporal": "temp"
+
+execution:
+  python: "uv run python"
+
+rendering:
+  engine: "pandoc"
+  pandoc_args:
+    - "--pdf-engine=xelatex"
+    - "--citeproc"
+    - "--number-sections"
