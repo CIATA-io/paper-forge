@@ -12,8 +12,11 @@ Write your analysis once, and the manuscript stays in sync forever.
 
 Scientific papers are full of numbers: sample sizes, means, p-values, effect sizes.
 These numbers originate in analysis scripts but are manually copied into manuscripts.
-This manual transcription causes errors — studies show that ~10-15% of published
-papers contain at least one inconsistent p-value.
+This manual transcription causes errors — Nuijten et al. (2016) found that roughly
+half of 250,000+ published psychology papers contained at least one inconsistent
+p-value, and about 1 in 8 had errors severe enough to change the statistical
+conclusion (Nuijten et al., "The prevalence of statistical reporting errors in
+psychology," *Behavior Research Methods*, 2016).
 
 ## The Solution
 
