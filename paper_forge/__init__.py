@@ -19,7 +19,7 @@ __version__ = "0.1.0"
 
 from paper_forge.result_unit import save_results, load_results
 from paper_forge.compiler import compile_manuscript
-from paper_forge.formatters import FORMATTERS, register_formatter
+from paper_forge.formatters import FORMATTERS, register_formatter, set_render_mode, get_render_mode
 
 __all__ = [
     "__version__",
@@ -28,4 +28,6 @@ __all__ = [
     "compile_manuscript",
     "FORMATTERS",
     "register_formatter",
+    "set_render_mode",
+    "get_render_mode",
 ]

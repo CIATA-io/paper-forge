@@ -20,7 +20,9 @@ from paper_forge.formatters import (
     fmt_pct,
     fmt_r,
     fmt_raw,
+    get_render_mode,
     register_formatter,
+    set_render_mode,
 )
 
 
@@ -248,7 +250,9 @@ class TestRegistry:
 
     def test_all_formatters_registered(self):
         expected = {"p", "p_stars", "stars", "r", "int", "pct",
-                    "f0", "f1", "f2", "f3", "min", "hr", "raw"}
+                    "f0", "f1", "f2", "f3", "min", "hr", "raw",
+                    "fmt0", "fmt1", "fmt2", "fmt3",
+                    "float0", "float1", "float2", "float3"}
         assert expected.issubset(set(FORMATTERS.keys()))
 
     def test_all_formatters_callable(self):
@@ -276,3 +280,89 @@ class TestRegistry:
                 continue
             result = func(float("nan"))
             assert result == "N/A", f"Formatter '{name}' returned '{result}' for NaN"
+
+
+class TestFormatterAliases:
+    """Tests for formatter aliases."""
+
+    def test_fmt_aliases_exist(self):
+        for i in range(4):
+            assert f"fmt{i}" in FORMATTERS
+            assert f"float{i}" in FORMATTERS
+
+    def test_fmt_aliases_match(self):
+        assert FORMATTERS["fmt0"] is FORMATTERS["f0"]
+        assert FORMATTERS["fmt1"] is FORMATTERS["f1"]
+        assert FORMATTERS["fmt2"] is FORMATTERS["f2"]
+        assert FORMATTERS["fmt3"] is FORMATTERS["f3"]
+
+    def test_float_aliases_match(self):
+        assert FORMATTERS["float0"] is FORMATTERS["f0"]
+        assert FORMATTERS["float1"] is FORMATTERS["f1"]
+
+    def test_aliases_produce_same_output(self):
+        assert FORMATTERS["fmt2"](3.14159) == FORMATTERS["f2"](3.14159)
+
+
+class TestRenderMode:
+    """Tests for render mode switching."""
+
+    def setup_method(self):
+        """Reset to unicode mode before each test."""
+        set_render_mode("unicode")
+
+    def teardown_method(self):
+        """Reset to unicode mode after each test."""
+        set_render_mode("unicode")
+
+    def test_default_mode_is_unicode(self):
+        assert get_render_mode() == "unicode"
+
+    def test_set_latex_mode(self):
+        set_render_mode("latex")
+        assert get_render_mode() == "latex"
+
+    def test_invalid_mode_raises(self):
+        with pytest.raises(ValueError, match="Unknown render mode"):
+            set_render_mode("html")
+
+    def test_fmt_p_unicode_mode(self):
+        set_render_mode("unicode")
+        result = fmt_p(3.8e-4)
+        assert "×10" in result
+        assert "⁻⁴" in result
+
+    def test_fmt_p_latex_mode(self):
+        set_render_mode("latex")
+        result = fmt_p(3.8e-4)
+        assert "\\times" in result
+        assert "10^{" in result
+        assert result.startswith("$")
+        assert result.endswith("$")
+
+    def test_fmt_p_latex_moderate_p_unchanged(self):
+        """Moderate p-values (>= 0.001) are not affected by render mode."""
+        set_render_mode("latex")
+        assert fmt_p(0.042) == "0.042"
+
+    def test_fmt_r_unicode_mode(self):
+        set_render_mode("unicode")
+        result = fmt_r(-0.45)
+        assert "−" in result  # Unicode minus
+        assert result == "−0.45"
+
+    def test_fmt_r_latex_mode(self):
+        set_render_mode("latex")
+        result = fmt_r(-0.45)
+        assert result == "$-0.45$"
+
+    def test_fmt_r_latex_positive_with_sign(self):
+        set_render_mode("latex")
+        result = fmt_r(0.32, sign=True)
+        assert result == "$+0.32$"
+
+    def test_fmt_r_latex_positive_no_sign(self):
+        set_render_mode("latex")
+        result = fmt_r(0.32, sign=False)
+        assert result == "$0.32$"
+

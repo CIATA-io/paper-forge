@@ -239,3 +239,40 @@ class TestCompileManuscript:
 
         result = compile_manuscript(config_path)
         assert "21.0" in result
+
+
+class TestRenderModeAutoDetect:
+    """Test that compile_manuscript auto-detects render mode from config."""
+
+    def test_latex_mode_from_pandoc_args(self, project_dir: Path) -> None:
+        """Config with --pdf-engine=xelatex should trigger latex mode."""
+        import yaml
+        from paper_forge.formatters import get_render_mode, set_render_mode
+
+        # Reset to unicode first
+        set_render_mode("unicode")
+
+        config_path = project_dir / "project.yaml"
+        config = yaml.safe_load(config_path.read_text())
+        config["rendering"] = {
+            "engine": "pandoc",
+            "pandoc_args": ["--pdf-engine=xelatex"],
+        }
+        config_path.write_text(yaml.dump(config))
+
+        compile_manuscript(config_path)
+        assert get_render_mode() == "latex"
+
+        # Clean up
+        set_render_mode("unicode")
+
+    def test_unicode_mode_when_no_latex_engine(self, project_dir: Path) -> None:
+        """Config without a LaTeX engine should keep unicode mode."""
+        from paper_forge.formatters import get_render_mode, set_render_mode
+
+        set_render_mode("unicode")
+
+        config_path = project_dir / "project.yaml"
+        compile_manuscript(config_path)
+        assert get_render_mode() == "unicode"
+

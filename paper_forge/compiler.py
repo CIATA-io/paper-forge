@@ -32,7 +32,7 @@ from typing import Any
 
 import yaml
 
-from paper_forge.formatters import FORMATTERS, fmt_raw
+from paper_forge.formatters import FORMATTERS, fmt_raw, set_render_mode
 from paper_forge.interpretation import InterpretationEngine
 from paper_forge.result_unit import load_results
 
@@ -286,6 +286,18 @@ def compile_manuscript(
     config_path = Path(config_path or "project.yaml")
     config = load_project_config(config_path)
     base_dir = config_path.parent
+
+    # Auto-detect render mode from rendering engine
+    render_config = config.get("render", {})
+    pdf_engine = render_config.get("pdf_engine", render_config.get("engine", ""))
+    # Also check pandoc_args for --pdf-engine=...
+    for arg in render_config.get("pandoc_args", []):
+        if arg.startswith("--pdf-engine="):
+            pdf_engine = arg.split("=", 1)[1]
+    if pdf_engine in ("xelatex", "pdflatex", "lualatex"):
+        set_render_mode("latex")
+    else:
+        set_render_mode("unicode")
 
     # Load results
     results_dir = base_dir / config["results_dir"]

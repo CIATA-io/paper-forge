@@ -68,6 +68,36 @@ result_units:
 
 This means `01_example.json` keys are referenced as `{{ex.key_name}}`.
 
+### Known-Values Pattern
+
+Not every result unit runs a live analysis. When values were computed externally
+(e.g., on a remote server) and are stable, create a "constants" unit:
+
+```python
+#!/usr/bin/env python3
+"""05_known_values — Values from external analysis."""
+from pathlib import Path
+from paper_forge.result_unit import save_results
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
+def main() -> None:
+    results = {
+        "n_factors": 8,
+        "strongest_r": -0.84,
+        "icc": 0.56,
+    }
+    save_results(
+        "05_known_values", results,
+        output_dir=REPO_ROOT / "manuscript" / "results",
+    )
+
+if __name__ == "__main__":
+    main()
+```
+
+This still gets git provenance and follows the same pipeline as computed units.
+
 ## Placeholder Syntax
 
 ```
@@ -78,6 +108,33 @@ This means `01_example.json` keys are referenced as `{{ex.key_name}}`.
 {{prefix.key:p}}         — p-value (p = .023 or p < .001)
 {{prefix.key:pct}}       — percentage (45.2%)
 ```
+
+### Formatter Aliases
+
+The following aliases are interchangeable:
+
+| Canonical | Aliases |
+|-----------|--------------------------------------|
+| `f0` | `fmt0`, `float0` |
+| `f1` | `fmt1`, `float1` |
+| `f2` | `fmt2`, `float2` |
+| `f3` | `fmt3`, `float3` |
+
+### Gotcha: `:r` Formatter and Sign Characters
+
+The `:r` formatter adds a `+` prefix for positive values by default.
+If your template already includes a sign (e.g., `$r = +{{stats.r:r}}$`),
+you'll get `++0.32`. Use one or the other:
+
+- ✅ `$r = {{stats.r:r}}$` → `$r = +0.32$`
+- ❌ `$r = +{{stats.r:r}}$` → `$r = ++0.32$`
+
+### Render Modes
+
+paper-forge auto-detects whether to use Unicode or LaTeX formatting based on
+your `project.yaml` rendering engine. If `--pdf-engine=xelatex` (or similar) is
+configured, small p-values will produce `$3.8 \times 10^{-4}$` (LaTeX math)
+instead of `3.8×10⁻⁴` (Unicode superscripts).
 
 ## Workflow Commands
 

@@ -6,6 +6,19 @@ NaN and None gracefully, returning "N/A".
 
 Formatters are registered in the global FORMATTERS dict and can be referenced
 by short name in manuscript placeholders, e.g. ``{{stats.p_value:p}}``.
+
+Render Modes
+~~~~~~~~~~~~
+
+Formatters support two render modes:
+
+- ``"unicode"`` (default): Uses Unicode superscripts and minus signs.
+  Best for plain text and HTML output.
+- ``"latex"``: Produces LaTeX math expressions (e.g. ``$3.8 \\times 10^{-4}$``).
+  Required when rendering to PDF via XeLaTeX/pdfLaTeX.
+
+Set the mode with :func:`set_render_mode` or let the compiler auto-detect
+from ``project.yaml``.
 """
 
 from __future__ import annotations
@@ -16,6 +29,32 @@ from typing import Callable
 # Unicode characters for formatting
 _SUPERSCRIPT_DIGITS = str.maketrans("0123456789-", "⁰¹²³⁴⁵⁶⁷⁸⁹⁻")
 _UNICODE_MINUS = "\u2212"  # −
+
+# ---------------------------------------------------------------------------
+# Render mode
+# ---------------------------------------------------------------------------
+
+_RENDER_MODE: str = "unicode"  # "unicode" or "latex"
+
+
+def set_render_mode(mode: str) -> None:
+    """Set the global render mode for formatters.
+
+    Args:
+        mode: Either ``"unicode"`` or ``"latex"``.
+
+    Raises:
+        ValueError: If mode is not recognized.
+    """
+    global _RENDER_MODE
+    if mode not in ("unicode", "latex"):
+        raise ValueError(f"Unknown render mode '{mode}'. Use 'unicode' or 'latex'.")
+    _RENDER_MODE = mode
+
+
+def get_render_mode() -> str:
+    """Return the current render mode (``'unicode'`` or ``'latex'``)."""
+    return _RENDER_MODE
 
 
 def _is_missing(x: object) -> bool:
@@ -31,14 +70,17 @@ def _is_missing(x: object) -> bool:
 def fmt_p(p: float | None) -> str:
     """Format a p-value for manuscript display.
 
-    Uses scientific notation with Unicode superscripts for very small values,
-    and standard decimal notation otherwise.
+    Uses scientific notation for very small values. The output format depends
+    on the render mode:
+
+    - ``"unicode"``: ``'4.5×10⁻¹⁷'`` (Unicode superscripts)
+    - ``"latex"``: ``'$4.5 \\times 10^{-17}$'`` (LaTeX math)
 
     Args:
         p: The p-value to format.
 
     Returns:
-        Formatted string, e.g. ``'4.5×10⁻¹⁷'``, ``'0.003'``, ``'< 0.001'``.
+        Formatted string.
 
     Examples:
         >>> fmt_p(4.52e-17)
@@ -58,9 +100,11 @@ def fmt_p(p: float | None) -> str:
         return f"{p:.3f}".rstrip("0").rstrip(".")
     if p == 0:
         return "< 0.001"
-    # Scientific notation with unicode superscripts
+    # Scientific notation
     exp = math.floor(math.log10(abs(p)))
     mantissa = p / (10**exp)
+    if _RENDER_MODE == "latex":
+        return f"${mantissa:.1f} \\times 10^{{{exp}}}$"
     exp_str = str(exp).translate(_SUPERSCRIPT_DIGITS)
     return f"{mantissa:.1f}×10{exp_str}"
 
@@ -99,13 +143,22 @@ def fmt_r(r: float | None, sign: bool = True) -> str:
     """Format an effect size (correlation coefficient).
 
     Uses Unicode minus sign for negative values and rounds to 2 decimal places.
+    In ``"latex"`` render mode, wraps the output in ``$...$`` math delimiters.
 
     Args:
         r: The effect size / correlation coefficient.
-        sign: If True, include a sign prefix (+ or −).
+        sign: If True, include a sign prefix (``+`` or ``−``) for non-zero values.
 
     Returns:
         Formatted string, e.g. ``'−0.45'``, ``'+0.32'``, ``'0.00'``.
+
+    .. warning::
+
+        When ``sign=True`` (the default), the formatter adds a ``+`` prefix
+        for positive values. If your template already includes a sign character
+        (e.g. ``$r = +{{stats.r:r}}$``), you'll get a double sign like ``++0.32``.
+        Either omit the sign from the template or use ``:r`` without a
+        prefix sign in the surrounding text.
 
     Examples:
         >>> fmt_r(-0.456)
@@ -119,6 +172,16 @@ def fmt_r(r: float | None, sign: bool = True) -> str:
         return "N/A"
     r = float(r)
     abs_val = f"{abs(r):.2f}"
+    if _RENDER_MODE == "latex":
+        if not sign:
+            if r < 0:
+                return f"$-{abs_val}$"
+            return f"${abs_val}$"
+        if r < 0:
+            return f"$-{abs_val}$"
+        if r > 0:
+            return f"$+{abs_val}$"
+        return "$0.00$"
     if not sign:
         if r < 0:
             return f"{_UNICODE_MINUS}{abs_val}"
@@ -297,6 +360,15 @@ FORMATTERS: dict[str, Callable] = {
     "min": fmt_min,
     "hr": fmt_hr,
     "raw": fmt_raw,
+    # Aliases — common alternative names
+    "fmt0": fmt_f0,
+    "fmt1": fmt_f1,
+    "fmt2": fmt_f2,
+    "fmt3": fmt_f3,
+    "float0": fmt_f0,
+    "float1": fmt_f1,
+    "float2": fmt_f2,
+    "float3": fmt_f3,
 }
 
 

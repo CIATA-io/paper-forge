@@ -200,16 +200,41 @@ make pipeline
 
 ## Built-in Formatters Reference
 
-| Formatter | Input | Output | Notes |
-|-----------|-------|--------|-------|
-| `int` | `1234` | `1,234` | Thousands separator |
-| `fmt1` | `12.345` | `12.3` | 1 decimal place |
-| `fmt2` | `12.345` | `12.35` | 2 decimal places |
-| `fmt3` | `12.3456` | `12.346` | 3 decimal places |
-| `r` | `0.3123` | `.312` | No leading zero, 3 decimals |
-| `p` | `0.0234` | `p = .023` | APA style, no leading zero |
-| `p` | `0.00034` | `p < .001` | Below threshold |
-| `pct` | `0.452` | `45.2%` | Multiply by 100, add % |
+| Formatter | Aliases | Input | Output | Notes |
+|-----------|---------|-------|--------|-------|
+| `int` | | `1234` | `1,234` | Thousands separator |
+| `f1` | `fmt1`, `float1` | `12.345` | `12.3` | 1 decimal place |
+| `f2` | `fmt2`, `float2` | `12.345` | `12.35` | 2 decimal places |
+| `f3` | `fmt3`, `float3` | `12.3456` | `12.346` | 3 decimal places |
+| `r` | | `0.32` | `+0.32` | Signed, 2 decimals, Unicode minus |
+| `p` | | `0.0234` | `0.023` | Strips trailing zeros |
+| `p` | | `3.8e-4` | `3.8×10⁻⁴` | Scientific notation (or LaTeX) |
+| `pct` | | `0.452` | `45.2%` | Multiply by 100, add % |
+| `stars` | `p_stars` | `0.003` | `**` | Significance stars |
+
+### Render Modes
+
+paper-forge auto-detects whether to use **Unicode** or **LaTeX** formatting
+based on your rendering engine. If your `project.yaml` includes
+`--pdf-engine=xelatex` (or similar LaTeX engine), small p-values will produce
+`$3.8 \times 10^{-4}$` instead of `3.8×10⁻⁴`, and `:r` values will be wrapped
+in `$...$` for proper minus signs.
+
+You can also set it manually:
+```python
+from paper_forge import set_render_mode
+set_render_mode("latex")   # or "unicode" (default)
+```
+
+### Gotcha: `:r` Sign Characters
+
+The `:r` formatter adds `+` for positive values by default. Don't also add
+a sign in your template text:
+
+```markdown
+✅  $r = {{stats.corr:r}}$       →  $r = +0.32$
+❌  $r = +{{stats.corr:r}}$      →  $r = ++0.32$
+```
 
 ---
 

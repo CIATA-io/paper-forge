@@ -17,6 +17,7 @@ def render_pdf(
     output_pdf: str | Path | None = None,
     engine: str = "pandoc",
     options: dict[str, Any] | None = None,
+    project_dir: str | Path | None = None,
 ) -> Path:
     """Render a compiled markdown file to PDF.
 
@@ -36,7 +37,12 @@ def render_pdf(
             - ``template``: Pandoc template path
             - ``variables``: Dict of pandoc variables
             - ``extra_args``: List of additional pandoc arguments
+            - ``pandoc_args``: List of additional pandoc arguments
+              (alias for ``extra_args``, typically from project.yaml)
             - ``resource_path``: Resource path for pandoc
+        project_dir: Working directory for pandoc. This should be the
+            project root so that relative figure paths in the markdown
+            resolve correctly. Defaults to ``input_md.parent``.
 
     Returns:
         Path to the generated PDF file.
@@ -53,14 +59,20 @@ def render_pdf(
     if engine != "pandoc":
         raise ValueError(f"Unsupported rendering engine: '{engine}'. Only 'pandoc' is supported.")
 
-    input_md = Path(input_md)
+    input_md = Path(input_md).resolve()
     if not input_md.exists():
         raise FileNotFoundError(f"Input markdown not found: {input_md}")
 
     if output_pdf is None:
         output_pdf = input_md.with_suffix(".pdf")
     else:
-        output_pdf = Path(output_pdf)
+        output_pdf = Path(output_pdf).resolve()
+
+    # Determine CWD for pandoc — project root so figure paths resolve
+    if project_dir is not None:
+        cwd = Path(project_dir).resolve()
+    else:
+        cwd = input_md.parent
 
     # Check pandoc is available
     if not shutil.which("pandoc"):
@@ -69,7 +81,7 @@ def render_pdf(
         )
 
     options = options or {}
-    pdf_engine = options.get("pdf_engine", "xelatex")
+    pdf_engine = options.get("pdf_engine", options.get("engine", "xelatex"))
 
     cmd: list[str] = [
         "pandoc",
@@ -98,8 +110,10 @@ def render_pdf(
         for key, value in options["variables"].items():
             cmd.extend(["-V", f"{key}={value}"])
 
-    if "extra_args" in options:
-        cmd.extend(options["extra_args"])
+    # Support both extra_args and pandoc_args (from project.yaml)
+    extra = options.get("extra_args", []) + options.get("pandoc_args", [])
+    if extra:
+        cmd.extend(extra)
 
     # Run pandoc
     try:
@@ -108,7 +122,7 @@ def render_pdf(
             capture_output=True,
             text=True,
             timeout=120,
-            cwd=str(input_md.parent),
+            cwd=str(cwd),
         )
     except subprocess.TimeoutExpired as e:
         raise RuntimeError(f"pandoc timed out after 120 seconds") from e
@@ -121,3 +135,4 @@ def render_pdf(
         )
 
     return output_pdf
+
