@@ -18,6 +18,7 @@ from paper_forge.formatters import (
     fmt_p,
     fmt_p_stars,
     fmt_pct,
+    fmt_pct0,
     fmt_r,
     fmt_raw,
     get_render_mode,
@@ -182,6 +183,24 @@ class TestFmtPct:
 
     def test_nan(self):
         assert fmt_pct(float("nan")) == "N/A"
+
+
+class TestFmtPct0:
+    """Tests for whole-number percentage formatting (:pct0)."""
+
+    def test_rounds_to_whole(self):
+        assert fmt_pct0(0.368) == "37%"
+        assert fmt_pct0(0.026) == "3%"
+
+    def test_zero_and_one(self):
+        assert fmt_pct0(0.0) == "0%"
+        assert fmt_pct0(1.0) == "100%"
+
+    def test_nan(self):
+        assert fmt_pct0(float("nan")) == "N/A"
+
+    def test_registered(self):
+        assert FORMATTERS["pct0"] is fmt_pct0
 
 
 class TestFmtFloats:

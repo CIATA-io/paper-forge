@@ -242,6 +242,26 @@ def fmt_pct(frac: float | None) -> str:
     return f"{float(frac) * 100:.1f}%"
 
 
+def fmt_pct0(frac: float | None) -> str:
+    """Format a fraction as a whole-number percentage (no decimals).
+
+    Args:
+        frac: The fraction (0–1 range) to convert to percentage.
+
+    Returns:
+        Formatted percentage string rounded to the nearest integer, e.g. ``'37%'``.
+
+    Examples:
+        >>> fmt_pct0(0.368)
+        '37%'
+        >>> fmt_pct0(0.026)
+        '3%'
+    """
+    if _is_missing(frac):
+        return "N/A"
+    return f"{float(frac) * 100:.0f}%"
+
+
 def fmt_f0(x: float | None) -> str:
     """Format a float with 0 decimal places.
 
@@ -362,6 +382,7 @@ FORMATTERS: dict[str, Callable] = {
     "r": fmt_r,
     "int": fmt_int,
     "pct": fmt_pct,
+    "pct0": fmt_pct0,
     "f0": fmt_f0,
     "f1": fmt_f1,
     "f2": fmt_f2,
