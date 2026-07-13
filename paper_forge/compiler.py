@@ -39,6 +39,11 @@ from paper_forge.result_unit import load_results
 # Regex matching {{prefix.key:formatter}} or {{prefix.key}}
 _PLACEHOLDER_RE = re.compile(r"\{\{([^{}]+)\}\}")
 
+# `<!-- pf-allow-literal: ... -->` are guard directives for the numeric-literal
+# checker (see paper_forge.literals), not manuscript content — strip them (and any
+# leading whitespace they leave) from the compiled output.
+_PF_DIRECTIVE_RE = re.compile(r"[ \t]*<!--\s*pf-allow-literal\b.*?-->")
+
 
 def load_project_config(path: str | Path) -> dict[str, Any]:
     """Load and validate a project configuration YAML file.
@@ -351,6 +356,9 @@ def compile_manuscript(
             return match.group(0)  # Leave placeholder as-is
 
     compiled = _PLACEHOLDER_RE.sub(_replace_match, template)
+
+    # Strip numeric-literal guard directives — they are source-only annotations.
+    compiled = _PF_DIRECTIVE_RE.sub("", compiled)
 
     if errors:
         print(f"\n  WARNING: {len(errors)} unresolved placeholder(s):", file=sys.stderr)
