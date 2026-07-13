@@ -222,32 +222,72 @@ def _cmd_compile(args: argparse.Namespace) -> int:
     from paper_forge.compiler import compile_manuscript
 
     try:
-        compile_manuscript(config_path=args.config, check_only=False)
+        compile_manuscript(
+            config_path=args.config, check_only=False, strict=args.strict
+        )
         return 0
+    except SystemExit:
+        # Raised by --strict when placeholders are unresolved.
+        return 1
     except FileNotFoundError as e:
         print(f"ERROR: {e}", file=sys.stderr)
         return 1
     except Exception as e:
         print(f"ERROR: {e}", file=sys.stderr)
         return 1
+
+
+def _check_literals(config_path: str, strict_literals: bool) -> int:
+    """Run the numeric-literal guard on the template. Returns an exit code delta."""
+    from paper_forge.compiler import load_project_config
+    from paper_forge.literals import check_literals, format_findings
+
+    config = load_project_config(config_path)
+    template_path = Path(config_path).parent / config["manuscript"]
+    lit_cfg = config.get("literals", {}) or {}
+    findings = check_literals(template_path, allow=lit_cfg.get("allow", []))
+
+    if not findings:
+        print("  No hardcoded numeric literals in the template.")
+        return 0
+
+    enforce = strict_literals or bool(lit_cfg.get("enforce", False))
+    label = "ERROR" if enforce else "WARNING"
+    print(
+        f"\n  {label}: {len(findings)} hardcoded numeric literal(s) in the template — "
+        "numbers should come from result units (or mark with "
+        "'<!-- pf-allow-literal: reason -->'):",
+        file=sys.stderr,
+    )
+    print(format_findings(findings), file=sys.stderr)
+    return 1 if enforce else 0
 
 
 def _cmd_check(args: argparse.Namespace) -> int:
-    """Check placeholders without writing output."""
+    """Check placeholders (and, unless disabled, hardcoded numeric literals)."""
     from paper_forge.compiler import compile_manuscript
 
+    exit_code = 0
     try:
         compile_manuscript(config_path=args.config, check_only=True)
         print("  All placeholders resolved successfully.")
-        return 0
     except SystemExit:
-        return 1
+        exit_code = 1
     except FileNotFoundError as e:
         print(f"ERROR: {e}", file=sys.stderr)
         return 1
     except Exception as e:
         print(f"ERROR: {e}", file=sys.stderr)
         return 1
+
+    if not args.no_literals:
+        try:
+            exit_code |= _check_literals(args.config, args.strict_literals)
+        except Exception as e:
+            print(f"ERROR (literal check): {e}", file=sys.stderr)
+            return 1
+
+    return exit_code
 
 
 def _cmd_pdf(args: argparse.Namespace) -> int:
@@ -332,16 +372,34 @@ def build_parser() -> argparse.ArgumentParser:
         default="project.yaml",
         help="Path to project.yaml (default: project.yaml)",
     )
+    compile_parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="Fail (non-zero exit) if any placeholder is unresolved, instead of "
+        "leaving it in the output and warning.",
+    )
 
     # check
     check_parser = subparsers.add_parser(
         "check",
-        help="Validate placeholders without writing output",
+        help="Validate placeholders and guard against hardcoded numeric literals",
     )
     check_parser.add_argument(
         "--config",
         default="project.yaml",
         help="Path to project.yaml (default: project.yaml)",
+    )
+    check_parser.add_argument(
+        "--strict-literals",
+        action="store_true",
+        help="Treat hardcoded numeric literals in the template as errors "
+        "(non-zero exit), not just warnings. Also settable via 'literals.enforce' "
+        "in project.yaml.",
+    )
+    check_parser.add_argument(
+        "--no-literals",
+        action="store_true",
+        help="Skip the numeric-literal guard entirely.",
     )
 
     # pdf

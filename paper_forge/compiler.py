@@ -259,6 +259,7 @@ def _resolve_derived(
 def compile_manuscript(
     config_path: str | Path | None = None,
     check_only: bool = False,
+    strict: bool = False,
 ) -> str:
     """Compile a manuscript by resolving all placeholders.
 
@@ -355,7 +356,7 @@ def compile_manuscript(
         print(f"\n  WARNING: {len(errors)} unresolved placeholder(s):", file=sys.stderr)
         for err in errors:
             print(f"    - {err}", file=sys.stderr)
-        if check_only:
+        if check_only or strict:
             sys.exit(1)
     else:
         print(f"  Successfully resolved all {resolved_count} placeholders")
