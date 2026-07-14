@@ -93,6 +93,8 @@ def fmt_p(p: float | None) -> str:
         >>> fmt_p(0.042)
         '0.042'
         >>> fmt_p(0.0003)
+        '3.0×10⁻⁴'
+        >>> fmt_p(0.0)
         '< 0.001'
     """
     if _is_missing(p):

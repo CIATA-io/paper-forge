@@ -153,8 +153,9 @@ emit interpretation strings as JSON values. This keeps the research
 judgment (what does p < .05 mean in this context?) with the analysis code.
 
 ### Provenance is Automatic
-`save_results()` always includes provenance metadata (git hash, dirty state,
-script file hash). Users don't need to remember to add it.
+`save_results()` always includes provenance metadata (git commit, branch, and
+dirty state) plus environment info (Python version, platform, package versions).
+Users don't need to remember to add it.
 
 ## Adding a New Formatter
 

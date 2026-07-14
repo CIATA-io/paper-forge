@@ -10,15 +10,19 @@ Placeholder syntax::
     {{prefix.key:formatter}} → formatted value (e.g. :p, :r, :int)
     {{interp.rule_name}}     → interpretation engine output
 
-Project YAML format::
+Project YAML (nested form; a flat form is also accepted — see
+:func:`load_project_config`). ``prefix_map`` maps a result-unit filename stem to
+its placeholder prefix::
 
-    manuscript: manuscript.md
-    output: compiled_manuscript.md
-    results_dir: results/
-    prefix_map:
-      stats: analysis_results
-      demo: demographics
-    interpretations: interpretations.yaml
+    manuscript:
+      template: manuscript/manuscript_template.md
+      output_md: manuscript/manuscript.md
+      results_dir: manuscript/results
+    result_units:
+      prefix_map:
+        "01_analysis": "stats"     # 01_analysis.json -> {{stats.*}}
+        "00_demographics": "demo"
+    interpretations: interpretations.yaml   # optional rules engine (see interpretation.py)
     derived:
       my_derived_key: "python_expression"
 """

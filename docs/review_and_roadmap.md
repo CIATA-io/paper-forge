@@ -37,7 +37,7 @@ turns the "numbers → prose, never the reverse" philosophy into an enforced gua
 it in `check` and as a pre-commit hook. *~1 module + tests.*
 
 **P0 — Strict compile.** `compile()` currently leaves unresolved `{{...}}` in the output
-and only warns (compiler.py:352–361). Add `--strict` (fail on any unresolved placeholder)
+and only warns (compiler.py:363–368). Add `--strict` (fail on any unresolved placeholder)
 and make it the pipeline default, so a broken slot can't reach a PDF.
 
 **P1 — Staleness detection (`check --stale`).** Flag a result JSON that is older than (a)
@@ -62,7 +62,7 @@ This would have caught the fabricated reference [6] (real title, invented author
 in the reservoir manuscript automatically.
 
 **P2 — Harden `derived` eval.** `_resolve_derived` uses `eval` with a builtin allowlist
-(compiler.py:252). Move to `simpleeval` or an AST-restricted evaluator.
+(compiler.py:257). Move to `simpleeval` or an AST-restricted evaluator.
 
 **P2 — Formatter robustness + property tests.** Type-mismatch errors (formatter on a
 string/None) should be caught in `check` with a clear message; add property tests for the
