@@ -14,7 +14,6 @@ from paper_forge.compiler import (
     load_project_config,
     resolve_placeholder,
 )
-from paper_forge.formatters import FORMATTERS
 
 
 @pytest.fixture
@@ -226,9 +225,7 @@ class TestCompileManuscript:
         # can't be Python identifiers)
         config_path = project_dir / "project.yaml"
         config = yaml.safe_load(config_path.read_text())
-        config["derived"] = {
-            "computed.ratio": "42.0 / 2"
-        }
+        config["derived"] = {"computed.ratio": "42.0 / 2"}
 
         # Update manuscript to use derived key
         manuscript = project_dir / "manuscript.md"
@@ -247,6 +244,7 @@ class TestRenderModeAutoDetect:
     def test_latex_mode_from_pandoc_args(self, project_dir: Path) -> None:
         """Config with --pdf-engine=xelatex should trigger latex mode."""
         import yaml
+
         from paper_forge.formatters import get_render_mode, set_render_mode
 
         # Reset to unicode first
@@ -275,4 +273,3 @@ class TestRenderModeAutoDetect:
         config_path = project_dir / "project.yaml"
         compile_manuscript(config_path)
         assert get_render_mode() == "unicode"
-

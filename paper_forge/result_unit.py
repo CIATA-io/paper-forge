@@ -181,8 +181,6 @@ def load_results(results_dir: str | Path) -> dict[str, dict[str, Any]]:
                 data = json.load(f)
                 loaded[json_path.stem] = data
             except json.JSONDecodeError as e:
-                raise ValueError(
-                    f"Invalid JSON in {json_path}: {e}"
-                ) from e
+                raise ValueError(f"Invalid JSON in {json_path}: {e}") from e
 
     return loaded

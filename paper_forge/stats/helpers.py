@@ -54,8 +54,13 @@ def mannwhitneyu(
     b = b[~np.isnan(b)]
 
     if len(a) == 0 or len(b) == 0:
-        return {"U": float("nan"), "p": float("nan"), "r": float("nan"),
-                "n_a": len(a), "n_b": len(b)}
+        return {
+            "U": float("nan"),
+            "p": float("nan"),
+            "r": float("nan"),
+            "n_a": len(a),
+            "n_b": len(b),
+        }
 
     stat_result = sp_stats.mannwhitneyu(a, b, alternative=alternative)
     u_stat = float(stat_result.statistic)
@@ -200,6 +205,7 @@ def zscore_within_group(
         >>> abs(z.mean()) < 1e-10
         True
     """
+
     def _zscore(group: pd.Series) -> pd.Series:
         std = group.std()
         if std == 0 or np.isnan(std):

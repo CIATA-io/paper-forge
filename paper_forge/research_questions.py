@@ -23,7 +23,7 @@ Registry format (one block per RQ; parsed leniently)::
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -63,13 +63,13 @@ def parse_registry(path: str | Path) -> dict[str, ResearchQuestion]:
 
     def _flush() -> None:
         if cur and cur.get("id"):
-            units = tuple(
-                u.strip() for u in cur.get("units", "").split(",") if u.strip()
-            )
+            units = tuple(u.strip() for u in cur.get("units", "").split(",") if u.strip())
             out[cur["id"]] = ResearchQuestion(
-                id=cur["id"], title=cur.get("title", ""),
+                id=cur["id"],
+                title=cur.get("title", ""),
                 question=cur.get("question", ""),
-                status=cur.get("status", "open").lower(), units=units,
+                status=cur.get("status", "open").lower(),
+                units=units,
             )
 
     for line in path.read_text(encoding="utf-8").splitlines():
@@ -129,8 +129,13 @@ def check_research_questions(
     # Status sanity.
     for rq in registry.values():
         if rq.status not in VALID_STATUSES:
-            findings.append(RqFinding("bad-status",
-                f"RQ '{rq.id}' has invalid status '{rq.status}' (use: {', '.join(sorted(VALID_STATUSES))})"))
+            findings.append(
+                RqFinding(
+                    "bad-status",
+                    f"RQ '{rq.id}' has invalid status '{rq.status}' "
+                    f"(use: {', '.join(sorted(VALID_STATUSES))})",
+                )
+            )
 
     valid_rq_ids = set(registry) | {METHODS}
 
@@ -138,33 +143,57 @@ def check_research_questions(
     for unit in unit_list:
         decl = declared.get(unit, [])
         if not decl:
-            findings.append(RqFinding("orphan-unit",
-                f"Unit '{unit}' declares no research question (pass rq=... to save_results, or rq='methods')"))
+            findings.append(
+                RqFinding(
+                    "orphan-unit",
+                    f"Unit '{unit}' declares no research question "
+                    "(pass rq=... to save_results, or rq='methods')",
+                )
+            )
             continue
         for rid in decl:
             if rid not in valid_rq_ids:
-                findings.append(RqFinding("unknown-rq",
-                    f"Unit '{unit}' declares rq '{rid}', which is not in the registry"))
+                findings.append(
+                    RqFinding(
+                        "unknown-rq",
+                        f"Unit '{unit}' declares rq '{rid}', which is not in the registry",
+                    )
+                )
             elif rid != METHODS and unit not in registry[rid].units:
-                findings.append(RqFinding("registry-mismatch",
-                    f"Unit '{unit}' declares rq '{rid}', but RQ '{rid}' does not list it under **units:**"))
+                findings.append(
+                    RqFinding(
+                        "registry-mismatch",
+                        f"Unit '{unit}' declares rq '{rid}', but RQ '{rid}' "
+                        "does not list it under **units:**",
+                    )
+                )
 
     # Every non-dropped, non-candidate RQ needs at least one unit; listed units must exist.
     unit_set = set(unit_list)
     for rq in registry.values():
         if rq.status in ("dropped", "candidate"):
             if rq.status == "dropped" and rq.units:
-                findings.append(RqFinding("registry-mismatch",
-                    f"RQ '{rq.id}' is dropped but still lists units {list(rq.units)} — remove them"))
+                findings.append(
+                    RqFinding(
+                        "registry-mismatch",
+                        f"RQ '{rq.id}' is dropped but still lists units "
+                        f"{list(rq.units)} — remove them",
+                    )
+                )
             continue
         backing = [u for u in unit_set if rq.id in declared.get(u, [])]
         if not backing and not rq.units:
-            findings.append(RqFinding("empty-rq",
-                f"RQ '{rq.id}' ({rq.status}) has no result units backing it"))
+            findings.append(
+                RqFinding("empty-rq", f"RQ '{rq.id}' ({rq.status}) has no result units backing it")
+            )
         for u in rq.units:
             if u not in unit_set:
-                findings.append(RqFinding("unknown-unit",
-                    f"RQ '{rq.id}' lists unit '{u}', which is not a project unit"))
+                findings.append(
+                    RqFinding(
+                        "unknown-unit",
+                        f"RQ '{rq.id}' lists unit '{u}', which is not a project unit",
+                    )
+                )
 
     return findings
 

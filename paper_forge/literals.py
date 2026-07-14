@@ -33,13 +33,13 @@ _NUMBER_RE = re.compile(r"(?<![A-Za-z0-9])[+-]?\d[\d,]*(?:\.\d+)?(?:[eE][+-]?\d+
 
 # Inline spans masked out before scanning (replaced by spaces to preserve columns).
 _INLINE_PROTECTED = (
-    re.compile(r"\{\{.*?\}\}"),                       # {{ placeholders }}
-    re.compile(r"`[^`]*`"),                           # `inline code`
-    re.compile(r"!?\]\([^)]*\)"),                     # ](target) of []() and ![]()
-    re.compile(r"<[^>\s]+>"),                          # <autolinks>/<tags>
-    re.compile(r"<!--.*?-->"),                        # HTML comments
+    re.compile(r"\{\{.*?\}\}"),  # {{ placeholders }}
+    re.compile(r"`[^`]*`"),  # `inline code`
+    re.compile(r"!?\]\([^)]*\)"),  # ](target) of []() and ![]()
+    re.compile(r"<[^>\s]+>"),  # <autolinks>/<tags>
+    re.compile(r"<!--.*?-->"),  # HTML comments
     re.compile(r"\[\s*\d+(?:\s*[,–-]\s*\d+)*\s*\]"),  # citation markers [6], [1, 2], [3-5]
-    re.compile(                                        # Table 1 / Figure 2A / Eq. 3 / Table S1
+    re.compile(  # Table 1 / Figure 2A / Eq. 3 / Table S1
         r"\b(?:Table|Figure|Fig\.?|Panel|Eq\.?|Equation|Section|Supplementary(?:\s+\w+)?)"
         r"\s+S?\d+[A-Za-z]?\b"
     ),

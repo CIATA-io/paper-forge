@@ -142,4 +142,3 @@ def render_pdf(
         )
 
     return output_pdf
-

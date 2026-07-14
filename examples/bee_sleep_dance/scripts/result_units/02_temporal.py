@@ -4,6 +4,7 @@
 Examines whether the effect of sleep deprivation on dance accuracy varies
 with time of day (morning vs. afternoon observation sessions).
 """
+
 from pathlib import Path
 
 import numpy as np
@@ -68,7 +69,6 @@ def main() -> None:
         "n_morning": n1,
         "n_afternoon": n2,
         "n_observations": n1 + n2,
-
         # Morning vs afternoon
         "mean_effect_morning": float(np.mean(morning_effects)),
         "sd_effect_morning": float(np.std(morning_effects, ddof=1)),
@@ -78,7 +78,6 @@ def main() -> None:
         "temporal_p": float(p_value),
         "temporal_r": float(effect_size),
         "temporal_interp": temporal_interp,
-
         # Correlation
         "correlation_rho": float(rho),
         "correlation_p": float(rho_p),

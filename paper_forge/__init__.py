@@ -17,9 +17,9 @@ Typical usage:
 
 __version__ = "0.1.0"
 
-from paper_forge.result_unit import save_results, load_results
 from paper_forge.compiler import compile_manuscript
-from paper_forge.formatters import FORMATTERS, register_formatter, set_render_mode, get_render_mode
+from paper_forge.formatters import FORMATTERS, get_render_mode, register_formatter, set_render_mode
+from paper_forge.result_unit import load_results, save_results
 
 __all__ = [
     "__version__",

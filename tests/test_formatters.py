@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import math
-
 import pytest
 
 from paper_forge.formatters import (
@@ -268,10 +266,29 @@ class TestRegistry:
     """Tests for the formatter registry."""
 
     def test_all_formatters_registered(self):
-        expected = {"p", "p_stars", "stars", "r", "int", "pct",
-                    "f0", "f1", "f2", "f3", "min", "hr", "raw",
-                    "fmt0", "fmt1", "fmt2", "fmt3",
-                    "float0", "float1", "float2", "float3"}
+        expected = {
+            "p",
+            "p_stars",
+            "stars",
+            "r",
+            "int",
+            "pct",
+            "f0",
+            "f1",
+            "f2",
+            "f3",
+            "min",
+            "hr",
+            "raw",
+            "fmt0",
+            "fmt1",
+            "fmt2",
+            "fmt3",
+            "float0",
+            "float1",
+            "float2",
+            "float3",
+        }
         assert expected.issubset(set(FORMATTERS.keys()))
 
     def test_all_formatters_callable(self):
@@ -401,4 +418,3 @@ class TestRenderMode:
         p_val = fmt_p(3.8e-4)
         rendered = f"$p = {p_val}$"
         assert "$$" not in rendered  # No nested delimiters
-

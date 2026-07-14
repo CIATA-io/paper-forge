@@ -13,6 +13,7 @@ def _texts(content: str, **kw) -> list[str]:
 
 # --- flagging real literals -------------------------------------------------
 
+
 def test_flags_hardcoded_result_number_in_prose():
     findings = find_literal_numbers("Graph features beat AR on 37% of days.")
     assert [f.text for f in findings] == ["37%"]
@@ -37,6 +38,7 @@ def test_reports_line_and_column():
 
 
 # --- things that must NOT be flagged ---------------------------------------
+
 
 def test_ignores_placeholders():
     assert _texts("Beat AR on {{wd.beat_rate:pct}} of {{wd.n_days}} days.") == []
@@ -94,6 +96,7 @@ def test_ignores_identifiers_with_embedded_digits():
 
 # --- escape hatches ---------------------------------------------------------
 
+
 def test_pf_allow_literal_comment_skips_line():
     content = "The hive holds ~1400 workers. <!-- pf-allow-literal: fixed colony -->"
     assert _texts(content) == []
@@ -106,6 +109,7 @@ def test_project_allow_regex_masks_matches():
 
 
 # --- file helper ------------------------------------------------------------
+
 
 def test_check_literals_reads_file(tmp_path):
     p = tmp_path / "template.md"

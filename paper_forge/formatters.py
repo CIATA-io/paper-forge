@@ -24,7 +24,7 @@ from ``project.yaml``.
 from __future__ import annotations
 
 import math
-from typing import Callable
+from collections.abc import Callable
 
 # Unicode characters for formatting
 _SUPERSCRIPT_DIGITS = str.maketrans("0123456789-", "⁰¹²³⁴⁵⁶⁷⁸⁹⁻")

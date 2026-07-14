@@ -111,9 +111,7 @@ def load_project_config(path: str | Path) -> dict[str, Any]:
     required = ["manuscript", "output", "results_dir"]
     missing = [k for k in required if k not in config]
     if missing:
-        raise ValueError(
-            f"Project config {path} is missing required fields: {missing}"
-        )
+        raise ValueError(f"Project config {path} is missing required fields: {missing}")
 
     return config
 
@@ -221,8 +219,7 @@ def resolve_placeholder(
     if fmt_name:
         if fmt_name not in formatters:
             raise KeyError(
-                f"Unknown formatter '{fmt_name}'. "
-                f"Available: {sorted(formatters.keys())}"
+                f"Unknown formatter '{fmt_name}'. Available: {sorted(formatters.keys())}"
             )
         fmt_func = formatters[fmt_name]
         return fmt_func(value)

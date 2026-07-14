@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -33,6 +32,7 @@ class TestGetGitProvenance:
     @patch("paper_forge.provenance.subprocess.run")
     def test_with_mocked_git(self, mock_run: MagicMock):
         """Test provenance with mocked git commands."""
+
         def mock_git_response(*args, **kwargs):
             cmd = args[0]
             result = MagicMock()
@@ -58,6 +58,7 @@ class TestGetGitProvenance:
     @patch("paper_forge.provenance.subprocess.run")
     def test_dirty_repo(self, mock_run: MagicMock):
         """Test provenance with dirty repo."""
+
         def mock_git_response(*args, **kwargs):
             cmd = args[0]
             result = MagicMock()
@@ -151,6 +152,7 @@ class TestGetEnvironment:
         env = get_environment()
         # Should be parseable as ISO 8601
         from datetime import datetime
+
         datetime.fromisoformat(env["timestamp"])
 
     def test_packages_is_dict(self):

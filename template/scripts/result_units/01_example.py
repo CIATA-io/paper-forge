@@ -9,6 +9,7 @@ This script:
 The JSON output is consumed by the manuscript compiler to fill
 placeholders like {{ex.n_total:int}} and {{ex.main_p:p}}.
 """
+
 from pathlib import Path
 
 import numpy as np
@@ -35,9 +36,7 @@ def main() -> None:
     control_scores = rng.normal(loc=65.0, scale=14.0, size=N_CONTROL)
 
     # Statistical test ---------------------------------------------------
-    u_stat, p_value = stats.mannwhitneyu(
-        treatment_scores, control_scores, alternative="two-sided"
-    )
+    u_stat, p_value = stats.mannwhitneyu(treatment_scores, control_scores, alternative="two-sided")
 
     # Effect size: rank-biserial correlation (positive ⇒ treatment ranks higher).
     n1, n2 = len(treatment_scores), len(control_scores)
@@ -73,8 +72,7 @@ def main() -> None:
         )
     elif p_value < 0.05:
         main_interp = (
-            "The difference between groups was significant, "
-            "suggesting a treatment effect."
+            "The difference between groups was significant, suggesting a treatment effect."
         )
     else:
         main_interp = (
@@ -96,12 +94,10 @@ def main() -> None:
     results = {
         # Metadata
         "title_modifier": "Preliminary",
-
         # Sample sizes
         "n_total": n_total,
         "n_treatment": n1,
         "n_control": n2,
-
         # Descriptive statistics
         "mean_treatment": float(np.mean(treatment_scores)),
         "sd_treatment": float(np.std(treatment_scores, ddof=1)),
@@ -109,12 +105,10 @@ def main() -> None:
         "mean_control": float(np.mean(control_scores)),
         "sd_control": float(np.std(control_scores, ddof=1)),
         "median_control": float(np.median(control_scores)),
-
         # Test statistics
         "u_statistic": float(u_stat),
         "main_p": float(p_value),
         "effect_size": float(effect_size),
-
         # Derived text
         "direction": direction,
         "effect_magnitude": effect_magnitude,
@@ -122,7 +116,6 @@ def main() -> None:
         "conclusion_verb": conclusion_verb,
         "main_interp": main_interp,
         "exclusion_note": exclusion_note,
-
         # Additional
         "response_rate": n_total / (n_total + n_excluded),
     }

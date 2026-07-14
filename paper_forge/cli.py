@@ -224,9 +224,7 @@ def _cmd_compile(args: argparse.Namespace) -> int:
     from paper_forge.compiler import compile_manuscript
 
     try:
-        compile_manuscript(
-            config_path=args.config, check_only=False, strict=args.strict
-        )
+        compile_manuscript(config_path=args.config, check_only=False, strict=args.strict)
         return 0
     except SystemExit:
         # Raised by --strict when placeholders are unresolved.
@@ -303,9 +301,7 @@ def _cmd_check_rqs(args: argparse.Namespace) -> int:
     try:
         config = load_project_config(args.config)
         base_dir = Path(args.config).parent
-        registry = base_dir / config.get(
-            "research_questions", "manuscript/research_questions.md"
-        )
+        registry = base_dir / config.get("research_questions", "manuscript/research_questions.md")
         results_dir = base_dir / config["results_dir"]
         prefix_map = config.get("prefix_map") or {}
         units = list(prefix_map.keys()) or None
@@ -321,9 +317,7 @@ def _cmd_check_rqs(args: argparse.Namespace) -> int:
 
         findings = check_research_questions(registry, results_dir, units)
         if findings:
-            print(
-                f"\n  {len(findings)} research-question issue(s):", file=sys.stderr
-            )
+            print(f"\n  {len(findings)} research-question issue(s):", file=sys.stderr)
             print(format_rq_findings(findings), file=sys.stderr)
             return 1
         print("  Every result unit maps to a research question, and every question is backed.")

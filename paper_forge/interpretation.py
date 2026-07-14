@@ -20,15 +20,16 @@ Example YAML rules::
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import yaml
-
 
 # ---------------------------------------------------------------------------
 # Built-in interpretation functions
 # ---------------------------------------------------------------------------
+
 
 def correlation_effect(
     p: float,
@@ -141,9 +142,15 @@ def comparison(
 
     if sig1 and sig2:
         if abs(rho1) > abs(rho2):
-            return f"both {label1} and {label2} show significant effects, with {label1} showing a stronger effect"
+            return (
+                f"both {label1} and {label2} show significant effects, "
+                f"with {label1} showing a stronger effect"
+            )
         elif abs(rho2) > abs(rho1):
-            return f"both {label1} and {label2} show significant effects, with {label2} showing a stronger effect"
+            return (
+                f"both {label1} and {label2} show significant effects, "
+                f"with {label2} showing a stronger effect"
+            )
         else:
             return f"both {label1} and {label2} show significant effects of similar magnitude"
     elif sig1 and not sig2:
@@ -204,6 +211,7 @@ _BUILTIN_FUNCTIONS: dict[str, Callable[..., str]] = {
 # Interpretation Engine
 # ---------------------------------------------------------------------------
 
+
 class InterpretationEngine:
     """Engine that applies interpretation rules to statistical results.
 
@@ -248,15 +256,12 @@ class InterpretationEngine:
 
         if not isinstance(config, dict) or "rules" not in config:
             raise ValueError(
-                f"Invalid interpretation rules file {yaml_path}: "
-                "expected a top-level 'rules' key"
+                f"Invalid interpretation rules file {yaml_path}: expected a top-level 'rules' key"
             )
 
         for name, rule in config["rules"].items():
             if "function" not in rule:
-                raise ValueError(
-                    f"Rule '{name}' in {yaml_path} is missing required 'function' key"
-                )
+                raise ValueError(f"Rule '{name}' in {yaml_path} is missing required 'function' key")
             if rule["function"] not in self.functions:
                 raise ValueError(
                     f"Rule '{name}' references unknown function '{rule['function']}'. "

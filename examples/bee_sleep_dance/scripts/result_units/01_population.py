@@ -4,6 +4,7 @@
 Generates mock data simulating a study where honeybees are either sleep-deprived
 or allowed normal rest, then their dance communication accuracy is measured.
 """
+
 from pathlib import Path
 
 import numpy as np
@@ -26,9 +27,7 @@ def main() -> None:
     control_errors = rng.gamma(shape=3.0, scale=5.5, size=N_CONTROL)
 
     # Mann-Whitney U test
-    u_stat, p_value = stats.mannwhitneyu(
-        deprived_errors, control_errors, alternative="two-sided"
-    )
+    u_stat, p_value = stats.mannwhitneyu(deprived_errors, control_errors, alternative="two-sided")
 
     n1, n2 = len(deprived_errors), len(control_errors)
     # Rank-biserial correlation, signed so positive ⇒ deprived bees rank higher.
@@ -66,9 +65,7 @@ def main() -> None:
             "affect overall body condition."
         )
     else:
-        mass_interp = (
-            "An unexpected difference in body mass was observed between groups."
-        )
+        mass_interp = "An unexpected difference in body mass was observed between groups."
 
     results = {
         # Sample
@@ -76,7 +73,6 @@ def main() -> None:
         "n_deprived": n1,
         "n_control": n2,
         "n_colonies": 6,
-
         # Dance accuracy
         "mean_error_deprived": float(np.mean(deprived_errors)),
         "sd_error_deprived": float(np.std(deprived_errors, ddof=1)),
@@ -84,13 +80,11 @@ def main() -> None:
         "mean_error_control": float(np.mean(control_errors)),
         "sd_error_control": float(np.std(control_errors, ddof=1)),
         "median_error_control": float(np.median(control_errors)),
-
         # Dance accuracy test
         "dance_u": float(u_stat),
         "dance_p": float(p_value),
         "dance_r": float(effect_size),
         "dance_interp": dance_interp,
-
         # Body mass (negative control)
         "mean_mass_deprived": float(np.mean(mass_deprived)),
         "mean_mass_control": float(np.mean(mass_control)),

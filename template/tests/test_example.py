@@ -5,6 +5,7 @@ These tests verify that:
 2. The output JSON contains all expected keys
 3. Statistical values are within plausible ranges
 """
+
 import json
 import subprocess
 import sys
@@ -98,11 +99,5 @@ class TestProvenance:
 
     def test_has_provenance_section(self, example_results):
         """The output should include git provenance metadata."""
-        # Provenance may be at top level or nested
-        has_provenance = (
-            "provenance" in example_results
-            or "git_hash" in example_results
-            or "script_hash" in example_results.get("provenance", {})
-        )
-        # Provenance is optional when not in a git repo, so we just check structure
+        # Provenance is optional when not in a git repo, so we just check structure.
         assert isinstance(example_results, dict)
