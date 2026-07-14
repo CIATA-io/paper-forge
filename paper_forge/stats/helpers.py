@@ -40,14 +40,13 @@ def mannwhitneyu(
         Dictionary with keys:
             - ``U``: U statistic
             - ``p``: p-value
-            - ``r``: rank-biserial correlation (effect size)
+            - ``r``: rank-biserial correlation effect size (positive ⇒ a > b)
             - ``n_a``: sample size of group a (after NaN removal)
             - ``n_b``: sample size of group b (after NaN removal)
 
     Examples:
-        >>> result = mannwhitneyu([1, 2, 3], [4, 5, 6])
-        >>> result["p"] < 0.1
-        True
+        >>> mannwhitneyu([1, 2, 3], [4, 5, 6])["r"]
+        -1.0
     """
     a = np.asarray(a, dtype=float)
     b = np.asarray(b, dtype=float)
@@ -62,9 +61,9 @@ def mannwhitneyu(
     u_stat = float(stat_result.statistic)
     p_val = float(stat_result.pvalue)
 
-    # Rank-biserial correlation: r = 1 - 2U/(n1*n2)
+    # Rank-biserial correlation, signed so positive ⇒ group a tends to exceed b.
     n1, n2 = len(a), len(b)
-    r_rb = 1.0 - (2.0 * u_stat) / (n1 * n2)
+    r_rb = (2.0 * u_stat) / (n1 * n2) - 1.0
 
     return {
         "U": u_stat,
