@@ -78,12 +78,34 @@ class TestRenderPdfOptions:
 
     @patch("paper_forge.renderers.pandoc.subprocess.run")
     @patch("paper_forge.renderers.pandoc.shutil.which", return_value="/usr/bin/pandoc")
-    def test_pdf_engine_from_engine_key(self, mock_which: MagicMock, mock_run: MagicMock, sample_md: Path) -> None:
-        """Config from project.yaml uses 'engine' key, not 'pdf_engine'."""
+    def test_pdf_engine_from_pdf_engine_key(self, mock_which: MagicMock, mock_run: MagicMock, sample_md: Path) -> None:
+        """An explicit 'pdf_engine' option drives --pdf-engine."""
         mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
-        render_pdf(sample_md, options={"engine": "lualatex"})
+        render_pdf(sample_md, options={"pdf_engine": "lualatex"})
         cmd = mock_run.call_args[0][0]
         assert "--pdf-engine=lualatex" in cmd
+
+    @patch("paper_forge.renderers.pandoc.subprocess.run")
+    @patch("paper_forge.renderers.pandoc.shutil.which", return_value="/usr/bin/pandoc")
+    def test_render_engine_key_is_not_the_pdf_engine(self, mock_which: MagicMock, mock_run: MagicMock, sample_md: Path) -> None:
+        """rendering.engine ('pandoc') is the renderer, NOT the LaTeX engine: the
+        --pdf-engine comes from pandoc_args (or defaults to xelatex), and there must be
+        exactly one — never the invalid `--pdf-engine=pandoc`."""
+        mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+        render_pdf(sample_md, options={"engine": "pandoc", "pandoc_args": ["--pdf-engine=xelatex"]})
+        cmd = mock_run.call_args[0][0]
+        engines = [a for a in cmd if str(a).startswith("--pdf-engine=")]
+        assert engines == ["--pdf-engine=xelatex"]
+        assert "--pdf-engine=pandoc" not in cmd
+
+    @patch("paper_forge.renderers.pandoc.subprocess.run")
+    @patch("paper_forge.renderers.pandoc.shutil.which", return_value="/usr/bin/pandoc")
+    def test_default_pdf_engine_is_xelatex(self, mock_which: MagicMock, mock_run: MagicMock, sample_md: Path) -> None:
+        """With no pdf_engine and no --pdf-engine in pandoc_args, default to xelatex."""
+        mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+        render_pdf(sample_md, options={"engine": "pandoc"})
+        cmd = mock_run.call_args[0][0]
+        assert "--pdf-engine=xelatex" in cmd
 
 
 class TestRenderPdfErrors:

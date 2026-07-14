@@ -81,16 +81,24 @@ def render_pdf(
         )
 
     options = options or {}
-    pdf_engine = options.get("pdf_engine", options.get("engine", "xelatex"))
+
+    # extra_args / pandoc_args (typically from project.yaml) may already carry a
+    # `--pdf-engine=...`; if so, let it drive the engine and don't add our own — a
+    # second, conflicting `--pdf-engine` makes pandoc error out. NOTE: options["engine"]
+    # is the *renderer* selector ("pandoc"), not a LaTeX engine, so it must never be
+    # used as `--pdf-engine` (doing so produced the invalid `--pdf-engine=pandoc`).
+    extra = list(options.get("extra_args", [])) + list(options.get("pandoc_args", []))
+    has_pdf_engine = any(str(a).startswith("--pdf-engine=") for a in extra)
 
     cmd: list[str] = [
         "pandoc",
         str(input_md),
         "-o",
         str(output_pdf),
-        f"--pdf-engine={pdf_engine}",
         "--standalone",
     ]
+    if not has_pdf_engine:
+        cmd.append(f"--pdf-engine={options.get('pdf_engine', 'xelatex')}")
 
     # Add optional arguments
     if "csl" in options:
@@ -110,8 +118,7 @@ def render_pdf(
         for key, value in options["variables"].items():
             cmd.extend(["-V", f"{key}={value}"])
 
-    # Support both extra_args and pandoc_args (from project.yaml)
-    extra = options.get("extra_args", []) + options.get("pandoc_args", [])
+    # Append extra_args / pandoc_args (computed above; may include --pdf-engine).
     if extra:
         cmd.extend(extra)
 
@@ -125,7 +132,7 @@ def render_pdf(
             cwd=str(cwd),
         )
     except subprocess.TimeoutExpired as e:
-        raise RuntimeError(f"pandoc timed out after 120 seconds") from e
+        raise RuntimeError("pandoc timed out after 120 seconds") from e
 
     if result.returncode != 0:
         raise RuntimeError(

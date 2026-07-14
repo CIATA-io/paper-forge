@@ -10,7 +10,6 @@ import numpy as np
 from scipy import stats
 
 from paper_forge.result_unit import save_results
-from paper_forge.provenance import get_git_provenance
 
 SEED = 42
 N_DEPRIVED = 45
@@ -32,7 +31,8 @@ def main() -> None:
     )
 
     n1, n2 = len(deprived_errors), len(control_errors)
-    effect_size = 1 - (2 * u_stat) / (n1 * n2)
+    # Rank-biserial correlation, signed so positive ⇒ deprived bees rank higher.
+    effect_size = (2 * u_stat) / (n1 * n2) - 1
     n_total = n1 + n2
 
     # Body mass comparison (no expected difference — negative control)
@@ -99,13 +99,7 @@ def main() -> None:
         "mass_interp": mass_interp,
     }
 
-    provenance = get_git_provenance(Path(__file__))
-    save_results(
-        results=results,
-        output_dir=RESULTS_DIR,
-        unit_name="01_population",
-        provenance=provenance,
-    )
+    save_results("01_population", results, output_dir=RESULTS_DIR)
     print(f"✓ 01_population: n={n_total}, U={u_stat:.1f}, p={p_value:.4f}")
 
 

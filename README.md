@@ -60,11 +60,10 @@ And paper-forge compiles it to:
 ### 1. Install
 
 ```bash
-# Install paper-forge (requires Python 3.10+)
-uv pip install paper-forge
-
-# Or with statistical helpers:
-uv pip install "paper-forge[stats]"
+# paper-forge isn't on PyPI yet — install from a clone (requires Python 3.10+):
+git clone <repo-url>
+cd paper-forge
+uv pip install -e .              # add ".[stats]" for the numpy/scipy/pandas helpers
 ```
 
 ### 2. Initialize a Project
@@ -114,7 +113,7 @@ def main():
 
     # Run statistics
     u, p = stats.mannwhitneyu(data_a, data_b, alternative="two-sided")
-    r = 1 - (2 * u) / (len(data_a) * len(data_b))
+    r = (2 * u) / (len(data_a) * len(data_b)) - 1   # rank-biserial (signed)
 
     # Build results (flat dict of raw values + interpretation text)
     results = {

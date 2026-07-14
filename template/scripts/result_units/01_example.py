@@ -15,7 +15,6 @@ import numpy as np
 from scipy import stats
 
 from paper_forge.result_unit import save_results
-from paper_forge.provenance import get_git_provenance
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -40,9 +39,9 @@ def main() -> None:
         treatment_scores, control_scores, alternative="two-sided"
     )
 
-    # Effect size: rank-biserial correlation
+    # Effect size: rank-biserial correlation (positive ⇒ treatment ranks higher).
     n1, n2 = len(treatment_scores), len(control_scores)
-    effect_size = 1 - (2 * u_stat) / (n1 * n2)
+    effect_size = (2 * u_stat) / (n1 * n2) - 1
 
     # Derived quantities -------------------------------------------------
     n_total = n1 + n2
@@ -128,14 +127,8 @@ def main() -> None:
         "response_rate": n_total / (n_total + n_excluded),
     }
 
-    # Save ---------------------------------------------------------------
-    provenance = get_git_provenance(Path(__file__))
-    save_results(
-        results=results,
-        output_dir=RESULTS_DIR,
-        unit_name="01_example",
-        provenance=provenance,
-    )
+    # Save (git provenance + environment are captured automatically) -----
+    save_results("01_example", results, output_dir=RESULTS_DIR)
 
     print(f"✓ 01_example: n={n_total}, U={u_stat:.1f}, p={p_value:.4f}, r={effect_size:.3f}")
 

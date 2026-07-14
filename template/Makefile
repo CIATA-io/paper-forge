@@ -33,7 +33,7 @@ check:
 
 # Render the compiled markdown to PDF via pandoc
 pdf:
-	$(PAPER_FORGE) render
+	$(PAPER_FORGE) pdf
 
 # Run the full pipeline: units → compile → pdf
 pipeline: units compile pdf

@@ -9,9 +9,9 @@ abstract: |
   accuracy in honeybees (Apis mellifera). A total of 87 bees
   from 6 colonies were assigned to sleep-deprived
   (n = 45) or control (n = 42) conditions.
-  Sleep-deprived bees showed 24.3° ± 12.9°
-  mean dance error compared to 16.5° ± 9.4°
-  in controls (0.002, r = +0.31).
+  Sleep-deprived bees showed 22.6° ± 9.0°
+  mean dance error compared to 15.4° ± 9.6°
+  in controls (2.8 \times 10^{-4}, r = +0.45).
   Sleep-deprived bees showed significantly larger dance errors than rested controls, indicating that sleep deprivation substantially impairs dance communication accuracy.
 ---
 
@@ -46,9 +46,9 @@ across 73 observation sessions.
 
 ## Population-Level Effects
 
-Sleep-deprived bees (Mdn = 22.1°) showed
-larger dance errors than controls (Mdn = 14.9°;
-U = 1312.0, 0.002, r = +0.31).
+Sleep-deprived bees (Mdn = 23.0°) showed
+larger dance errors than controls (Mdn = 12.5°;
+U = 1373.0, 2.8 \times 10^{-4}, r = +0.45).
 Sleep-deprived bees showed significantly larger dance errors than rested controls, indicating that sleep deprivation substantially impairs dance communication accuracy.
 
 Body mass did not differ significantly between groups, confirming that the experimental manipulation did not affect overall body condition.
@@ -56,16 +56,16 @@ Body mass did not differ significantly between groups, confirming that the exper
 ## Temporal Patterns
 
 The sleep deprivation effect was stronger in morning sessions
-(M = 8.7° ± 4.0°)
+(M = 9.2° ± 4.0°)
 than afternoon sessions
-(M = 4.2° ± 3.4°;
-U = 932.0, 3.8 \times 10^{-4}, r = +0.40).
+(M = 4.0° ± 2.9°;
+U = 1134.0, 2.3 \times 10^{-7}, r = +0.71).
 The effect of sleep deprivation on dance accuracy was significantly stronger in morning observations compared to afternoon observations, suggesting partial recovery of dance communication over the course of the day.
 
 Additionally, dance error was correlated with time since waking
-(ρ = +0.41, 0.003,
+(ρ = +0.69, 3.3 \times 10^{-8},
 n = 50).
-Dance error was positively correlated with hours since waking (ρ = 0.412), indicating progressive deterioration of dance accuracy with extended wakefulness.
+Dance error was positively correlated with hours since waking (ρ = 0.689), indicating progressive deterioration of dance accuracy with extended wakefulness.
 
 # Discussion
 

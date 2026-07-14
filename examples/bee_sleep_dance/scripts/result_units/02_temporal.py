@@ -10,7 +10,6 @@ import numpy as np
 from scipy import stats
 
 from paper_forge.result_unit import save_results
-from paper_forge.provenance import get_git_provenance
 
 SEED = 123
 N_MORNING = 38
@@ -32,7 +31,8 @@ def main() -> None:
         morning_effects, afternoon_effects, alternative="two-sided"
     )
     n1, n2 = len(morning_effects), len(afternoon_effects)
-    effect_size = 1 - (2 * u_stat) / (n1 * n2)
+    # Rank-biserial correlation, signed so positive ⇒ the morning effect ranks higher.
+    effect_size = (2 * u_stat) / (n1 * n2) - 1
 
     # Correlation: hours since waking vs. dance error (in deprived bees)
     hours_awake = rng.uniform(2, 14, size=50)
@@ -86,13 +86,7 @@ def main() -> None:
         "n_correlation": 50,
     }
 
-    provenance = get_git_provenance(Path(__file__))
-    save_results(
-        results=results,
-        output_dir=RESULTS_DIR,
-        unit_name="02_temporal",
-        provenance=provenance,
-    )
+    save_results("02_temporal", results, output_dir=RESULTS_DIR)
     print(f"✓ 02_temporal: temporal U={u_stat:.1f}, p={p_value:.4f}, ρ={rho:.3f}")
 
 

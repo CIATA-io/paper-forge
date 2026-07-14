@@ -19,7 +19,7 @@ check:
 	$(PAPER_FORGE) check
 
 pdf:
-	$(PAPER_FORGE) render
+	$(PAPER_FORGE) pdf
 
 pipeline: units compile pdf
 

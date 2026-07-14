@@ -1,34 +1,40 @@
 {
   "unit_name": "01_population",
-  "generated_at": "2026-06-15T10:30:00Z",
-  "provenance": {
-    "git_hash": "abc123def456",
-    "git_dirty": false,
-    "script_path": "scripts/result_units/01_population.py",
-    "script_hash": "sha256:example_hash_population"
-  },
   "results": {
     "n_total": 87,
     "n_deprived": 45,
     "n_control": 42,
     "n_colonies": 6,
-
-    "mean_error_deprived": 24.31,
-    "sd_error_deprived": 12.87,
-    "median_error_deprived": 22.14,
-    "mean_error_control": 16.52,
-    "sd_error_control": 9.43,
-    "median_error_control": 14.89,
-
-    "dance_u": 1312.0,
-    "dance_p": 0.0021,
-    "dance_r": 0.312,
+    "mean_error_deprived": 22.58478679371026,
+    "sd_error_deprived": 8.960491229386701,
+    "median_error_deprived": 23.047394243357907,
+    "mean_error_control": 15.376653056204251,
+    "sd_error_control": 9.61657941947796,
+    "median_error_control": 12.49074014836232,
+    "dance_u": 1373.0,
+    "dance_p": 0.00028206683886773665,
+    "dance_r": 0.45291005291005293,
     "dance_interp": "Sleep-deprived bees showed significantly larger dance errors than rested controls, indicating that sleep deprivation substantially impairs dance communication accuracy.",
-
-    "mean_mass_deprived": 95.12,
-    "mean_mass_control": 94.38,
-    "mass_u": 923.0,
-    "mass_p": 0.782,
+    "mean_mass_deprived": 95.66710829855288,
+    "mean_mass_control": 93.73814740989897,
+    "mass_u": 1114.0,
+    "mass_p": 0.15235594365292648,
     "mass_interp": "Body mass did not differ significantly between groups, confirming that the experimental manipulation did not affect overall body condition."
+  },
+  "provenance": {
+    "git_commit": "a0b641daf7feb98a76facea9ef6c0a092e3cfbc1",
+    "git_branch": "main",
+    "git_dirty": true,
+    "git_label": "a0b641d (main, dirty)"
+  },
+  "environment": {
+    "python_version": "3.12.9 | packaged by Anaconda, Inc. | (main, Feb  6 2025, 12:55:12) [Clang 14.0.6 ]",
+    "platform": "macOS-14.7-arm64-arm-64bit",
+    "timestamp": "2026-07-14T18:27:30.719957+00:00",
+    "packages": {
+      "numpy": "2.5.1",
+      "PyYAML": "6.0.3",
+      "scipy": "1.18.0"
+    }
   }
 }

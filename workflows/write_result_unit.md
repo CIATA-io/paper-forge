@@ -39,7 +39,6 @@
    import numpy as np
    from scipy import stats
    from paper_forge.result_unit import save_results
-   from paper_forge.provenance import get_git_provenance
 
    RESULTS_DIR = Path(__file__).resolve().parents[2] / "manuscript" / "results"
    DATA_PATH = Path(__file__).resolve().parents[2] / "data" / "input.csv"
@@ -69,13 +68,7 @@
            "main_interp": "...",
        }
 
-       provenance = get_git_provenance(Path(__file__))
-       save_results(
-           results=results,
-           output_dir=RESULTS_DIR,
-           unit_name="NN_name",
-           provenance=provenance,
-       )
+       save_results("NN_name", results, output_dir=RESULTS_DIR)
 
    if __name__ == "__main__":
        main()
