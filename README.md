@@ -443,8 +443,9 @@ within the research-question registry and the analysis charter (`manuscript/revi
 | **focus** | a claim/RQ is weak or under-supported | propose narrowing/dropping the RQ |
 | **expand** | needs *new data* / features / models | propose a rebuttal note only — nothing runs |
 
-Every candidate change must pass the gate (`check --strict-literals` + `compile` +
-`check-rqs`), and the analyst edits result units only — so a number changes only through
+Every candidate change must pass the gate — `paper-forge gate` (strict `compile` +
+`check --strict-literals` + `check-rqs`) — and the analyst edits result units only, so a
+number changes only through
 reproducible code. See [`docs/review_loop_build_plan.md`](docs/review_loop_build_plan.md)
 for the full design and milestones.
 
@@ -478,6 +479,7 @@ The Makefile targets wrap the `paper-forge` CLI, which you can also call directl
 | `paper-forge compile [--strict]` | Fill placeholders → compiled markdown |
 | `paper-forge check [--strict-literals] [--no-literals]` | Validate placeholders + numeric-literal guard |
 | `paper-forge check-rqs` | Verify every result unit serves a declared research question |
+| `paper-forge gate` | Run the full consistency gate: strict compile + literal guard + check-rqs |
 | `paper-forge pdf [-o out.pdf]` | Render compiled markdown to PDF |
 
 All commands accept `--config PATH` (default `project.yaml`).

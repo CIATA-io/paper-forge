@@ -1,18 +1,20 @@
 """Command-line interface for paper-forge.
 
 Provides the ``paper-forge`` CLI with subcommands:
-    - ``init``    — scaffold a new project
-    - ``compile`` — compile manuscript (resolve placeholders)
-    - ``check``   — validate placeholders without writing output
-    - ``pdf``     — render compiled markdown to PDF
+    - ``init``      — scaffold a new project
+    - ``compile``   — compile manuscript (resolve placeholders)
+    - ``check``     — validate placeholders + numeric-literal guard
+    - ``check-rqs`` — verify every result unit serves a declared research question
+    - ``gate``      — run the full consistency gate (compile + check + check-rqs)
+    - ``pdf``       — render compiled markdown to PDF
 """
 
 from __future__ import annotations
 
 import argparse
 import sys
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Sequence
 
 
 def _cmd_init(args: argparse.Namespace) -> int:
@@ -334,6 +336,55 @@ def _cmd_check_rqs(args: argparse.Namespace) -> int:
         return 1
 
 
+def _cmd_gate(args: argparse.Namespace) -> int:
+    """Run the full consistency gate: strict compile + literal guard + RQ check.
+
+    Chains the checks that must all pass before a manuscript is trustworthy, and
+    returns non-zero if any fails. This is the deterministic gate the Claude-native
+    review loop runs before scoring. The research-question check runs only when a
+    registry is present, so ``gate`` is usable with or without the RQ layer.
+    """
+    from paper_forge.compiler import compile_manuscript, load_project_config
+
+    rc = 0
+    print("  [gate] strict compile + placeholder check ...")
+    try:
+        compile_manuscript(config_path=args.config, check_only=False, strict=True)
+    except SystemExit:
+        rc = 1
+    except FileNotFoundError as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        return 1
+    except Exception as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        return 1
+
+    print("  [gate] numeric-literal guard ...")
+    try:
+        rc |= _check_literals(args.config, strict_literals=True)
+    except Exception as e:
+        print(f"ERROR (literal check): {e}", file=sys.stderr)
+        rc = 1
+
+    # Research-question check — only when a registry is present.
+    try:
+        config = load_project_config(args.config)
+        registry = Path(args.config).parent / config.get(
+            "research_questions", "manuscript/research_questions.md"
+        )
+        if registry.exists():
+            print("  [gate] research-question check ...")
+            rc |= _cmd_check_rqs(args)
+        else:
+            print("  [gate] research-question check skipped (no registry).")
+    except Exception as e:
+        print(f"ERROR (rq check): {e}", file=sys.stderr)
+        rc = 1
+
+    print(f"\n  [gate] {'PASS' if rc == 0 else 'FAIL'}", file=sys.stderr if rc else sys.stdout)
+    return rc
+
+
 def _cmd_pdf(args: argparse.Namespace) -> int:
     """Render the compiled manuscript to PDF."""
     from paper_forge.compiler import load_project_config
@@ -389,7 +440,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--version",
         action="version",
-        version=f"%(prog)s 0.1.0",
+        version="%(prog)s 0.1.0",
     )
 
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
@@ -457,6 +508,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="Path to project.yaml (default: project.yaml)",
     )
 
+    # gate
+    gate_parser = subparsers.add_parser(
+        "gate",
+        help="Run the consistency gate (strict compile + literal guard + check-rqs)",
+    )
+    gate_parser.add_argument(
+        "--config",
+        default="project.yaml",
+        help="Path to project.yaml (default: project.yaml)",
+    )
+
     # pdf
     pdf_parser = subparsers.add_parser(
         "pdf",
@@ -498,6 +560,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "compile": _cmd_compile,
         "check": _cmd_check,
         "check-rqs": _cmd_check_rqs,
+        "gate": _cmd_gate,
         "pdf": _cmd_pdf,
     }
 

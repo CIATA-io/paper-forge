@@ -12,9 +12,9 @@ service. This is milestone M0 of the review loop; M2+ add the editor and the kee
 
 ## Steps
 
-1. **Gate first.** Run `paper-forge gate` (or, until it exists, `paper-forge check
-   --strict-literals` + `paper-forge compile`). If the manuscript doesn't compile cleanly or has
-   hardcoded literals, stop and report that — there's nothing stable to review.
+1. **Gate first.** Run `paper-forge gate` (strict compile + numeric-literal guard + check-rqs).
+   If the manuscript doesn't compile cleanly or has hardcoded literals, stop and report that —
+   there's nothing stable to review.
 
 2. **Gather context.** Identify the compiled manuscript (`project.yaml` → `manuscript.output_md`),
    the rubric (`manuscript/review/rubric.md`), and the result JSONs (`manuscript/results/*.json`).
@@ -25,9 +25,10 @@ service. This is milestone M0 of the review loop; M2+ add the editor and the kee
    spawn `general-purpose` and paste this repo's `.claude/agents/manuscript-reviewer.md` body as
    the role, plus the rubric path.
 
-4. **Verify numeric claims.** For each finding with `numeric_claim: true`, run `paper-forge
-   consistency` (once implemented) or directly check the named `provenance_key` against
-   `manuscript/results/<unit>.json`. Drop or downgrade any finding the JSON contradicts — the
+4. **Verify numeric claims.** For each finding with `numeric_claim: true`, directly check the
+   named `provenance_key` against `manuscript/results/<unit>.json` (a `paper-forge consistency`
+   command that automates this is planned — see the build plan). Drop or downgrade any finding
+   the JSON contradicts — the
    reviewer must not win on a hallucinated discrepancy.
 
 5. **Report.** Present the findings ranked most-severe first (blocking → major → minor), each

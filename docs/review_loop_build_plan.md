@@ -29,16 +29,18 @@ an external service.
 
 ## New deterministic paper-forge pieces (Python, no LLM)
 
-- **`paper-forge review-context`** — bundle what a reviewer subagent needs into one file:
-  the compiled manuscript, the rubric, and the number→key→unit→commit provenance map (so the
-  reviewer can cite where each number came from and can't hallucinate a discrepancy).
-- **`paper-forge consistency`** — verify every number rendered in the manuscript still equals
-  its result-unit value (re-render placeholders and diff). Exit non-zero on any mismatch.
-  This is the numeric half of the gate and the reviewer's ground truth.
-- **`paper-forge gate`** — convenience: run `compile --strict` + `check --strict-literals` +
-  `consistency` + `pytest -q`, print a pass/fail report. The editor's candidates must pass it.
+- **`paper-forge gate`** — ✅ **implemented.** Runs `compile --strict` + `check
+  --strict-literals` + `check-rqs` (the RQ step is skipped when no registry is present) and
+  prints a pass/fail report. The editor's candidates must pass it.
+- **`paper-forge review-context`** — *proposed (not yet built).* Bundle what a reviewer subagent
+  needs into one file: the compiled manuscript, the rubric, and the number→key→unit→commit
+  provenance map (so the reviewer can cite where each number came from).
+- **`paper-forge consistency`** — *proposed (not yet built).* Verify every number rendered in
+  the manuscript still equals its result-unit value (re-render placeholders and diff); exit
+  non-zero on any mismatch. Until it lands, verify numeric claims by checking the named key
+  against `manuscript/results/<unit>.json` directly.
 
-## Claude Code assets paper-forge ships (installed by `paper-forge init`)
+## Claude Code assets paper-forge ships (copy from `templates/` into your project's `.claude/`)
 
 ```
 .claude/
