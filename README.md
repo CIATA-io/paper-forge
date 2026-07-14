@@ -104,7 +104,6 @@ from pathlib import Path
 import numpy as np
 from scipy import stats
 from paper_forge.result_unit import save_results
-from paper_forge.provenance import get_git_provenance
 
 RESULTS_DIR = Path(__file__).resolve().parents[2] / "manuscript" / "results"
 
@@ -126,12 +125,9 @@ def main():
         "main_interp": "Significant difference." if p < 0.05 else "No difference.",
     }
 
-    save_results(
-        results=results,
-        output_dir=RESULTS_DIR,
-        unit_name="01_example",
-        provenance=get_git_provenance(Path(__file__)),
-    )
+    # Git provenance + environment are captured automatically.
+    # rq= links this unit to a declared research question (see "Research Questions").
+    save_results("01_example", results, output_dir=RESULTS_DIR, rq="RQ1")
 
 if __name__ == "__main__":
     main()
@@ -187,7 +183,8 @@ make pipeline
 {{prefix.key:fmt3}}       3 decimal places → 12.345
 {{prefix.key:r}}          Correlation/effect size → .312
 {{prefix.key:p}}          P-value (APA style) → p = .023 or p < .001
-{{prefix.key:pct}}        Percentage → 45.2%
+{{prefix.key:pct}}        Percentage, 1 decimal → 45.2%
+{{prefix.key:pct0}}       Percentage, whole number → 45%
 ```
 
 ### Rules
@@ -202,15 +199,20 @@ make pipeline
 
 | Formatter | Aliases | Input | Output | Notes |
 |-----------|---------|-------|--------|-------|
-| `int` | | `1234` | `1,234` | Thousands separator |
+| `int` | | `1234` | `1,234` | Rounded, thousands separator |
+| `f0` | `fmt0`, `float0` | `42.7` | `43` | 0 decimals |
 | `f1` | `fmt1`, `float1` | `12.345` | `12.3` | 1 decimal place |
 | `f2` | `fmt2`, `float2` | `12.345` | `12.35` | 2 decimal places |
 | `f3` | `fmt3`, `float3` | `12.3456` | `12.346` | 3 decimal places |
-| `r` | | `0.32` | `+0.32` | Signed, 2 decimals, Unicode minus |
-| `p` | | `0.0234` | `0.023` | Strips trailing zeros |
-| `p` | | `3.8e-4` | `3.8×10⁻⁴` | Scientific notation (or LaTeX) |
-| `pct` | | `0.452` | `45.2%` | Multiply by 100, add % |
-| `stars` | `p_stars` | `0.003` | `**` | Significance stars |
+| `r` | | `-0.456` | `−0.46` | Signed, 2 decimals, Unicode/ASCII minus |
+| `p` | | `0.0234` | `0.023` | APA p-value; strips trailing zeros |
+| `p` | | `3.8e-4` | `3.8×10⁻⁴` | Scientific notation (Unicode or LaTeX) |
+| `stars` | `p_stars` | `0.003` | `**` | Significance stars (`***`/`**`/`*`/`n.s.`) |
+| `pct` | | `0.452` | `45.2%` | ×100, 1 decimal |
+| `pct0` | | `0.368` | `37%` | ×100, whole number |
+| `min` | | `150` | `2.5 min` | Seconds → minutes |
+| `hr` | | `5400` | `1.5 hr` | Seconds → hours |
+| `raw` | | `anything` | `anything` | Default when no formatter given |
 
 ### Render Modes
 
@@ -282,6 +284,76 @@ In your template:
 
 ---
 
+## Reproducibility Guardrails
+
+paper-forge doesn't just *let* you source every number from code — it **checks** that you did.
+
+`paper-forge check` scans the **template** for hardcoded numbers that should have come from
+a result unit:
+
+```bash
+paper-forge check                    # placeholders + literal guard (literals are warnings)
+paper-forge check --strict-literals  # hardcoded literals become errors (non-zero exit)
+paper-forge check --no-literals      # skip the literal guard entirely
+```
+
+Digits inside placeholders, fenced code, citations (`[12]`), and section numbers are ignored.
+For a number that genuinely belongs in prose (an order in a definition, a fixed axis label),
+mark it with an inline escape hatch that names the reason:
+
+```markdown
+We fit an AR(1) baseline. <!-- pf-allow-literal: AR-order notation -->
+```
+
+The compiler **strips these directives** from the compiled output, so they never reach the
+PDF. Set defaults in `project.yaml`:
+
+```yaml
+literals:
+  enforce: true      # treat literals as errors (same as --strict-literals)
+  allow:             # substrings always permitted in the template
+    - "95%"
+```
+
+This is what turns *"numbers → prose, never the reverse"* from a guideline into a gate.
+
+---
+
+## Research Questions
+
+Every result unit should exist to answer a **declared research question**. paper-forge makes
+that link explicit and enforceable, which bounds how far an analysis can sprawl.
+
+Declare your questions in `manuscript/research_questions.md`:
+
+```markdown
+## RQ-1 — Does the treatment reduce the outcome?
+- **question:** Does treatment X lower outcome Y relative to control?
+- **status:** answered
+- **units:** 01_demographics, 02_primary
+```
+
+Statuses are `open` · `answered` · `candidate` · `dropped`. Descriptive/setup units that
+characterise the data rather than answer a question declare `rq="methods"`.
+
+Link each unit to its question in `save_results`, then enforce the mapping:
+
+```python
+save_results("02_primary", results, output_dir=RESULTS_DIR, rq="RQ-1")
+```
+```bash
+paper-forge check-rqs
+```
+
+`check-rqs` fails if a unit serves no declared question, points at an unknown RQ, or if an
+`open`/`answered` question has no backing units. Because the set of questions is the natural
+ceiling on analysis breadth, *growing* the analysis (admit a new `candidate` question) or
+*narrowing* it (mark one `dropped`) becomes a deliberate, reviewable edit to this one file —
+not scope creep. Point paper-forge at the registry with `research_questions:` in
+`project.yaml` (defaults to `manuscript/research_questions.md`).
+
+---
+
 ## Project Configuration (`project.yaml`)
 
 ```yaml
@@ -301,6 +373,14 @@ result_units:
     "01_demographics": "demo"
     "02_primary": "pri"
     "03_secondary": "sec"
+
+# Where the research-question registry lives (default shown).
+research_questions: "manuscript/research_questions.md"
+
+# Numeric-literal guard (optional; defaults shown).
+literals:
+  enforce: false          # true = hardcoded literals fail `check` (like --strict-literals)
+  allow: []               # substrings always permitted in the template
 
 execution:
   python: "uv run python"
@@ -332,6 +412,38 @@ to complete a specific task in the paper-writing process.
 
 ---
 
+## AI Review Loop (runs inside Claude Code)
+
+paper-forge ships a closed-loop reviewer that runs **entirely on Claude Code subagents** —
+no external LLM, no API keys. The referee is a subagent; the gate is paper-forge itself
+(deterministic Python). The assets live under `templates/claude/` (copy into your project's
+`.claude/`):
+
+| Command | Agent | What it does |
+|---------|-------|--------------|
+| `/paper-review` | `manuscript-reviewer` | Compiles the paper, scores it against `manuscript/review/rubric.md`, and returns ranked findings — every numeric claim **verified against the result JSONs**, so the referee can't win on a hallucinated discrepancy. Read-only. |
+| `/paper-analyze` | `data-analyst` | Turns review findings into **bounded, gate-verified** changes to the *result units* — never prose, never unbounded new work. |
+
+### Scope control (default-deny on expansion)
+
+Reviewers always ask for more analysis. `/paper-analyze` triages each finding and only acts
+within the research-question registry and the analysis charter (`manuscript/review/charter.md`):
+
+| Tier | What it is | Default action |
+|------|------------|----------------|
+| **fix** | correct a computation the paper already reports | auto: run the analyst |
+| **strengthen** | add rigor (CI/test/sensitivity) to an existing claim | ask first, then run |
+| **deepen** | an unknown the *existing data* can answer, no current RQ | propose a `candidate` RQ for a human to admit |
+| **focus** | a claim/RQ is weak or under-supported | propose narrowing/dropping the RQ |
+| **expand** | needs *new data* / features / models | propose a rebuttal note only — nothing runs |
+
+Every candidate change must pass the gate (`check --strict-literals` + `compile` +
+`check-rqs`), and the analyst edits result units only — so a number changes only through
+reproducible code. See [`docs/review_loop_build_plan.md`](docs/review_loop_build_plan.md)
+for the full design and milestones.
+
+---
+
 ## Example Project
 
 The `examples/bee_sleep_dance/` directory contains a complete working example
@@ -347,6 +459,22 @@ The example includes:
 - Two result units (population analysis + temporal analysis)
 - Pre-generated JSON results (compiles without running scripts)
 - A complete manuscript template with 30+ placeholders
+
+---
+
+## Command-Line Interface
+
+The Makefile targets wrap the `paper-forge` CLI, which you can also call directly:
+
+| Command | Description |
+|---------|-------------|
+| `paper-forge init [dir]` | Scaffold a new project |
+| `paper-forge compile [--strict]` | Fill placeholders → compiled markdown |
+| `paper-forge check [--strict-literals] [--no-literals]` | Validate placeholders + numeric-literal guard |
+| `paper-forge check-rqs` | Verify every result unit serves a declared research question |
+| `paper-forge pdf [-o out.pdf]` | Render compiled markdown to PDF |
+
+All commands accept `--config PATH` (default `project.yaml`).
 
 ---
 
@@ -373,7 +501,9 @@ The example includes:
 
 The single most important rule: **every number in the manuscript must originate
 from a result unit's JSON output**. If you catch yourself typing `n = 42` in
-the template, stop and add it to a result unit instead.
+the template, stop and add it to a result unit instead. `paper-forge check
+--strict-literals` enforces this mechanically (see [Reproducibility
+Guardrails](#reproducibility-guardrails)).
 
 ### One Result Unit, One JSON
 
@@ -392,6 +522,13 @@ the statistical test that produced it.
 Every result JSON includes metadata about which git commit and script version
 produced it. This creates an audit trail from any number in the paper back to
 the exact code that computed it.
+
+### Every Result Unit Serves a Research Question
+
+Each unit declares the question it answers (`rq=` in `save_results`), and
+`paper-forge check-rqs` enforces the mapping. The set of research questions is
+the natural bound on how far an analysis can grow (see [Research
+Questions](#research-questions)).
 
 ---
 

@@ -15,15 +15,17 @@ placeholder-based templating.
 paper-forge/
 ├── paper_forge/                  # Core Python package
 │   ├── __init__.py
-│   ├── cli.py                    # CLI entry point (paper-forge command)
-│   ├── compiler.py               # Placeholder resolution & compilation
-│   ├── config.py                 # project.yaml loader
-│   ├── formatters.py             # Number formatters (p, r, int, fmt2, pct)
-│   ├── provenance.py             # Git provenance & file hashing
+│   ├── cli.py                    # argparse CLI (init/compile/check/check-rqs/pdf)
+│   ├── compiler.py               # project.yaml loader + placeholder compilation
+│   ├── formatters.py             # Number formatters (p, r, int, fmt2, pct, pct0, …)
+│   ├── literals.py               # Numeric-literal guard (hardcoded-number detector)
+│   ├── research_questions.py     # RQ registry parser + check-rqs enforcement
+│   ├── interpretation.py         # Interpretation-string helpers
+│   ├── provenance.py             # Git provenance & environment capture
 │   ├── result_unit.py            # save_results() / load_results()
-│   ├── checker.py                # Placeholder validation
-│   ├── renderer.py               # Pandoc PDF rendering
-│   └── stats.py                  # Statistical test wrappers
+│   ├── validators.py             # Placeholder validation
+│   ├── renderers/                # Pandoc PDF rendering
+│   └── stats/                    # Statistical test wrappers
 │
 ├── template/                     # Project template (copied by `paper-forge init`)
 │   ├── project.yaml              # Example configuration
@@ -67,15 +69,17 @@ paper-forge/
 
 | Module | Purpose |
 |--------|---------|
-| `cli.py` | Click-based CLI: `init`, `compile`, `check`, `render` |
-| `compiler.py` | Reads template, loads JSONs, resolves `{{prefix.key:fmt}}` placeholders |
-| `config.py` | Parses `project.yaml`, validates config schema |
-| `formatters.py` | Formatting functions: `fmt_p()`, `fmt_r()`, `fmt_int()`, etc. |
-| `provenance.py` | `get_git_provenance()` — captures git hash, dirty state, script hash |
-| `result_unit.py` | `save_results()` — writes JSON; `load_results()` — reads JSON |
-| `checker.py` | Validates all template placeholders have corresponding result keys |
-| `renderer.py` | Wraps pandoc to convert compiled markdown to PDF |
-| `stats.py` | Thin wrappers around scipy.stats with consistent output dicts |
+| `cli.py` | argparse CLI: `init`, `compile`, `check`, `check-rqs`, `pdf` |
+| `compiler.py` | Loads `project.yaml`, reads JSONs, resolves `{{prefix.key:fmt}}` placeholders; strips `pf-allow-literal` directives from the output |
+| `formatters.py` | Formatting functions (`fmt_p()`, `fmt_r()`, `fmt_int()`, `fmt_pct0()`, …) and the `FORMATTERS` registry |
+| `literals.py` | Numeric-literal guard: flags hardcoded numbers in the template (`check --strict-literals`) |
+| `research_questions.py` | Parses the RQ registry; `check_research_questions()` powers `check-rqs` |
+| `interpretation.py` | Helpers for building interpretation strings in result units |
+| `provenance.py` | `get_git_provenance()` / `get_environment()` — git hash, dirty state, package list |
+| `result_unit.py` | `save_results()` — writes JSON envelope (+ `rq`); `load_results()` — reads JSON |
+| `validators.py` | Validates all template placeholders have corresponding result keys |
+| `renderers/` | Wraps pandoc to convert compiled markdown to PDF |
+| `stats/` | Thin wrappers around scipy.stats with consistent output dicts |
 
 ### Data Flow
 
@@ -161,7 +165,7 @@ script file hash). Users don't need to remember to add it.
        return f"[{value[0]:.2f}, {value[1]:.2f}]"
    ```
 
-2. Register it in the `FORMATTERS` dict in `compiler.py`
+2. Register it in the `FORMATTERS` dict in `formatters.py`
 
 3. Add tests in `tests/test_formatters.py`
 
@@ -169,17 +173,19 @@ script file hash). Users don't need to remember to add it.
 
 ## Adding a New CLI Command
 
-1. Add the command function in `paper_forge/cli.py`:
+1. Add a `_cmd_<name>(args)` handler in `paper_forge/cli.py`, register a
+   subparser in `build_parser()`, and wire it into the `handlers` dict:
    ```python
-   @cli.command()
-   @click.option("--config", default="project.yaml")
-   def my_command(config):
+   def _cmd_my_command(args: argparse.Namespace) -> int:
        ...
+       return 0
+   # build_parser():  subparsers.add_parser("my-command", ...)
+   # main():          handlers = {..., "my-command": _cmd_my_command}
    ```
 
 2. Add tests in `tests/test_cli.py`
 
-3. Add a Makefile target in `template/Makefile`
+3. Expose it via a Makefile target and the CLI table in `README.md`
 
 ## Coding Standards
 
