@@ -34,7 +34,5 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
-# paper-forge outputs
-compiled_manuscript*.md
+# paper-forge outputs (generated; compiled markdown is regenerable)
 *.pdf
-results/*.json

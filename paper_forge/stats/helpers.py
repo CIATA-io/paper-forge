@@ -139,7 +139,10 @@ def partial_spearman(
     Returns:
         Dictionary with keys:
             - ``rho``: Partial Spearman's rho
-            - ``p``: p-value (approximate, based on residual correlation)
+            - ``p``: p-value — **approximate**: the Spearman p-value of the residual
+              correlation, not adjusted for the control's lost degree of freedom, so it
+              is mildly anti-conservative. For inference prefer a dedicated
+              partial-correlation routine (e.g. ``pingouin.partial_corr``).
             - ``n``: number of valid observations
 
     Examples:

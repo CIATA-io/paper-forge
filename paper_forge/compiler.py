@@ -236,6 +236,10 @@ def _resolve_derived(
     Derived keys are Python expressions that can reference other result values.
     They are defined in the project config under ``derived:``.
 
+    Security note: expressions are evaluated with :func:`eval` under a restricted
+    ``__builtins__``. Treat ``project.yaml`` as trusted, author-controlled input —
+    do not compile a config from an untrusted source.
+
     Args:
         derived: Mapping of key → Python expression string.
         all_results: The results dict (modified in-place).
