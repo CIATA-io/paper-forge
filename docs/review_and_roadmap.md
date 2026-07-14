@@ -17,8 +17,8 @@ project, and shipped agent workflows (`scaffold`, `write_unit`, `draft_template`
 the right invariant.
 
 **The central gap: the invariant is documented, not enforced.**
-`validators.check_placeholders` verifies that every `{{...}}` *resolves*; `check_figures`
-verifies figures exist. Nothing scans for a **hardcoded numeric literal typed into the
+`paper-forge check` (via the compiler) verifies that every `{{...}}` *resolves*. Nothing
+scans for a **hardcoded numeric literal typed into the
 prose** (`37%`, `n = 42`, `MC = 2.67`). So a human — or an LLM revising the draft — can
 paste or hallucinate a number and paper-forge stays silent. This is exactly what bit the
 reservoir paper: revisions went into a hand-maintained `main.md` full of literal numbers,

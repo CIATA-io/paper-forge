@@ -20,10 +20,9 @@ paper-forge/
 │   ├── formatters.py             # Number formatters (p, r, int, fmt2, pct, pct0, …)
 │   ├── literals.py               # Numeric-literal guard (hardcoded-number detector)
 │   ├── research_questions.py     # RQ registry parser + check-rqs enforcement
-│   ├── interpretation.py         # Interpretation-string helpers
+│   ├── interpretation.py         # Optional compile-time interpretation rules engine
 │   ├── provenance.py             # Git provenance & environment capture
 │   ├── result_unit.py            # save_results() / load_results()
-│   ├── validators.py             # Placeholder validation
 │   ├── renderers/                # Pandoc PDF rendering
 │   └── stats/                    # Statistical test wrappers
 │
@@ -74,10 +73,9 @@ paper-forge/
 | `formatters.py` | Formatting functions (`fmt_p()`, `fmt_r()`, `fmt_int()`, `fmt_pct0()`, …) and the `FORMATTERS` registry |
 | `literals.py` | Numeric-literal guard: flags hardcoded numbers in the template (`check --strict-literals`) |
 | `research_questions.py` | Parses the RQ registry; `check_research_questions()` powers `check-rqs` |
-| `interpretation.py` | Helpers for building interpretation strings in result units |
+| `interpretation.py` | Optional `InterpretationEngine` — derives phrases from result values at compile time (enable via `interpretations:` in project.yaml) |
 | `provenance.py` | `get_git_provenance()` / `get_environment()` — git hash, dirty state, package list |
 | `result_unit.py` | `save_results()` — writes JSON envelope (+ `rq`); `load_results()` — reads JSON |
-| `validators.py` | Validates all template placeholders have corresponding result keys |
 | `renderers/` | Wraps pandoc to convert compiled markdown to PDF |
 | `stats/` | Thin wrappers around scipy.stats with consistent output dicts |
 
@@ -147,10 +145,14 @@ stays simple: `{{prefix.key}}`. No need for dot-notation traversal.
 Each formatter takes a single numeric value and returns a string.
 They are stateless and have no side effects. This makes them easy to test.
 
-### Interpretation as Data
-The compiler does not generate interpretation text. Instead, result units
-emit interpretation strings as JSON values. This keeps the research
-judgment (what does p < .05 mean in this context?) with the analysis code.
+### Interpretation as Data (with an optional rules engine)
+The recommended pattern is that result units emit interpretation strings as JSON
+values, keeping the research judgment (what does p < .05 mean here?) with the
+analysis code. An optional compile-time rules engine (`interpretation.py`, enabled
+via `interpretations:` in project.yaml) can also derive phrases from result values
+for projects that prefer that. Either way, keep raw numbers out of interpretation
+strings — the numeric-literal guard only scans the template, so numerals baked into
+a string bypass it.
 
 ### Provenance is Automatic
 `save_results()` always includes provenance metadata (git commit, branch, and

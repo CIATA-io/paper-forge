@@ -54,9 +54,9 @@ def main() -> None:
 
     if rho_p < 0.05:
         correlation_interp = (
-            f"Dance error was positively correlated with hours since waking "
-            f"(ρ = {rho:.3f}), indicating progressive deterioration of "
-            f"dance accuracy with extended wakefulness."
+            "Dance error was positively correlated with hours since waking, "
+            "indicating progressive deterioration of dance accuracy with "
+            "extended wakefulness."
         )
     else:
         correlation_interp = (

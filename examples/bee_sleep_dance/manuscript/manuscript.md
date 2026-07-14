@@ -65,7 +65,7 @@ The effect of sleep deprivation on dance accuracy was significantly stronger in 
 Additionally, dance error was correlated with time since waking
 (ρ = +0.69, 3.3 \times 10^{-8},
 n = 50).
-Dance error was positively correlated with hours since waking (ρ = 0.689), indicating progressive deterioration of dance accuracy with extended wakefulness.
+Dance error was positively correlated with hours since waking, indicating progressive deterioration of dance accuracy with extended wakefulness.
 
 # Discussion
 

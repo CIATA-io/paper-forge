@@ -14,19 +14,19 @@
     "temporal_interp": "The effect of sleep deprivation on dance accuracy was significantly stronger in morning observations compared to afternoon observations, suggesting partial recovery of dance communication over the course of the day.",
     "correlation_rho": 0.688547418967587,
     "correlation_p": 3.2634588926748596e-08,
-    "correlation_interp": "Dance error was positively correlated with hours since waking (ρ = 0.689), indicating progressive deterioration of dance accuracy with extended wakefulness.",
+    "correlation_interp": "Dance error was positively correlated with hours since waking, indicating progressive deterioration of dance accuracy with extended wakefulness.",
     "n_correlation": 50
   },
   "provenance": {
-    "git_commit": "a0b641daf7feb98a76facea9ef6c0a092e3cfbc1",
-    "git_branch": "main",
+    "git_commit": "c1f89eee5eb6ee42b9bb8bc8daa1efce05b484d7",
+    "git_branch": "fix/repro-and-doc-consistency",
     "git_dirty": true,
-    "git_label": "a0b641d (main, dirty)"
+    "git_label": "c1f89ee (fix/repro-and-doc-consistency, dirty)"
   },
   "environment": {
     "python_version": "3.12.9 | packaged by Anaconda, Inc. | (main, Feb  6 2025, 12:55:12) [Clang 14.0.6 ]",
     "platform": "macOS-14.7-arm64-arm-64bit",
-    "timestamp": "2026-07-14T18:27:31.345563+00:00",
+    "timestamp": "2026-07-14T19:08:59.407304+00:00",
     "packages": {
       "numpy": "2.5.1",
       "PyYAML": "6.0.3",

@@ -248,35 +248,41 @@ a sign in your template text:
 
 ---
 
-## Interpretation Engine
+## Interpretation
 
-The interpretation engine generates natural-language text from statistical results.
-Instead of the compiler generating prose, **result units emit interpretation text
-as string values in their JSON output**. This keeps interpretation logic close to
-the analysis code.
+Statistical interpretation ("the effect was significant") is a research decision, so
+paper-forge keeps it next to the analysis. Two options:
 
-### Pattern
+**1. Interpretation as data (recommended).** A result unit emits the interpretation as a
+plain string in its JSON, and the template inserts it with `{{prefix.key}}`:
 
-In your result unit:
 ```python
 if p < 0.001:
-    main_interp = "The effect was highly significant (p < .001)."
+    main_interp = "The effect was highly significant."
 elif p < 0.05:
-    main_interp = f"The effect was significant (p = {p:.3f})."
+    main_interp = "The effect was significant."
 else:
     main_interp = "No significant effect was observed."
 
 results["main_interp"] = main_interp
 ```
-
-In your template:
 ```markdown
 {{ex.main_interp}}
 ```
 
-### Why This Approach?
+> **Keep numbers out of interpretation strings.** The numeric-literal guard only scans the
+> template, so a value baked into a string (e.g. `f"(p = {p:.3f})"`) slips through unchecked
+> and can drift from the formatted placeholder for the same number. Keep the prose
+> qualitative and show the value once via a placeholder:
+> `{{ex.main_interp}} (p = {{ex.main_p:p}})`.
 
-- **Interpretation is a research decision** — it belongs with the analysis, not the compiler
+**2. Optional rules engine.** For canned phrasings derived from result values at compile
+time, `paper_forge.interpretation` ships a small YAML-rule engine (`InterpretationEngine`);
+point `project.yaml` at an `interpretations:` file to enable it. Most projects don't need it.
+
+### Why interpretation lives with the analysis
+
+- **It's a research decision** — it belongs with the analysis, not the compiler
 - **Context matters** — the same p-value means different things in different analyses
 - **Flexibility** — you can write any text, not just canned phrases
 - **Traceability** — `git blame` on the result unit shows who wrote the interpretation
