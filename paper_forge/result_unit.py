@@ -85,6 +85,7 @@ def save_results(
     figures: list[str | Path] | None = None,
     output_dir: str | Path | None = None,
     repo_dir: str | Path | None = None,
+    rq: str | list[str] | None = None,
 ) -> Path:
     """Save analysis results as a JSON file with provenance metadata.
 
@@ -98,6 +99,13 @@ def save_results(
         figures: Optional list of figure file paths produced by this analysis.
         output_dir: Directory to write the JSON file. Defaults to ``./results/``.
         repo_dir: Git repository directory for provenance. Defaults to CWD.
+        rq: The research question(s) this unit answers — an RQ id or list of ids
+            from the project's research-question registry (see
+            ``paper_forge.research_questions``). Recorded in the JSON envelope so
+            ``paper-forge check-rqs`` can enforce that every unit serves a declared
+            question (the natural bound on analysis breadth). Use ``"methods"`` for
+            descriptive/setup units that characterise the data rather than answer a
+            question.
 
     Returns:
         Path to the written JSON file.
@@ -106,7 +114,7 @@ def save_results(
         ValueError: If unit_name is empty or results is not a dict.
 
     Examples:
-        >>> path = save_results("stats", {"p": 0.05, "n": 100})
+        >>> path = save_results("stats", {"p": 0.05, "n": 100}, rq="RQ1")
         >>> path.name
         'stats.json'
     """
@@ -124,6 +132,9 @@ def save_results(
         "provenance": get_git_provenance(repo_dir),
         "environment": get_environment(),
     }
+
+    if rq is not None:
+        envelope["rq"] = [rq] if isinstance(rq, str) else list(rq)
 
     if data_hash is not None:
         envelope["data_hash"] = data_hash

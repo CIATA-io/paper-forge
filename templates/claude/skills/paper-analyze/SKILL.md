@@ -19,10 +19,15 @@ expansion**:
 |---|---|---|
 | **fix** | correct/reconcile a computation the paper already reports | **auto**: run the data-analyst |
 | **strengthen** | add rigor (CI/test/sensitivity) to an existing claim, same data+features | **ask the human** first, then run |
-| **expand** | new data / colonies / features / models | **propose only** — a rebuttal note; nothing runs |
+| **deepen** | an unknown the **existing data** can answer, but no current RQ covers | **propose a `candidate` RQ** for a human to admit; only then build its units |
+| **focus** | a claim/RQ is weak or under-supported | **propose** narrowing/dropping the RQ; human signs off |
+| **expand** | needs **new data** / colonies / features / models | **propose only** — a rebuttal note; nothing runs |
 
-The `manuscript/review/charter.md` file is the hard boundary: the analyst may operate only
-inside it. Amending the charter is a deliberate human act — that's what lets the analysis grow.
+The boundary is the **research-question registry** (`manuscript/research_questions.md`): every
+result unit must serve a declared RQ (`paper-forge check-rqs` enforces it), so the breadth of
+the analysis is bounded by the set of questions. Growing the analysis (`deepen`) or narrowing it
+(`focus`) is a deliberate human amendment to that registry — that's what lets it change without
+scope creep. `manuscript/review/charter.md` adds the data/feature/model bounds within each RQ.
 
 ## Steps
 1. **Select findings.** Take the analysis-shaped findings (`kind` = stat/repro) from the latest

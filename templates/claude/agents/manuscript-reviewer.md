@@ -30,6 +30,10 @@ number→key→unit provenance map).
    template or a unit, or as prose/argument changes — never "change 2.67 to X" in the prose.
 5. Check the rubric's "known recurring concerns": flag the open ones, and note the
    already-addressed ones as resolved rather than re-raising them.
+6. When you spot an **unknown the existing data could answer** but that no current research
+   question covers, flag it as a `deepen` opportunity (a candidate new question), and when a
+   claim/question is weak, flag it as `focus` — these are proposals for a human to admit into or
+   retire from `manuscript/research_questions.md`, not edits you or the analyst may make directly.
 
 ## Output
 Return **only** the JSON object specified in the rubric's "Output" section (overall_score,

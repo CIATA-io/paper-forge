@@ -290,6 +290,50 @@ def _cmd_check(args: argparse.Namespace) -> int:
     return exit_code
 
 
+def _cmd_check_rqs(args: argparse.Namespace) -> int:
+    """Check that every result unit serves a declared research question."""
+    from paper_forge.compiler import load_project_config
+    from paper_forge.research_questions import (
+        check_research_questions,
+        format_rq_findings,
+    )
+
+    try:
+        config = load_project_config(args.config)
+        base_dir = Path(args.config).parent
+        registry = base_dir / config.get(
+            "research_questions", "manuscript/research_questions.md"
+        )
+        results_dir = base_dir / config["results_dir"]
+        prefix_map = config.get("prefix_map") or {}
+        units = list(prefix_map.keys()) or None
+
+        if not registry.exists():
+            print(
+                f"ERROR: research-question registry not found: {registry}\n"
+                "  Create it (see paper_forge.research_questions), or set "
+                "'research_questions:' in project.yaml.",
+                file=sys.stderr,
+            )
+            return 1
+
+        findings = check_research_questions(registry, results_dir, units)
+        if findings:
+            print(
+                f"\n  {len(findings)} research-question issue(s):", file=sys.stderr
+            )
+            print(format_rq_findings(findings), file=sys.stderr)
+            return 1
+        print("  Every result unit maps to a research question, and every question is backed.")
+        return 0
+    except FileNotFoundError as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        return 1
+    except Exception as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        return 1
+
+
 def _cmd_pdf(args: argparse.Namespace) -> int:
     """Render the compiled manuscript to PDF."""
     from paper_forge.compiler import load_project_config
@@ -402,6 +446,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="Skip the numeric-literal guard entirely.",
     )
 
+    # check-rqs
+    check_rqs_parser = subparsers.add_parser(
+        "check-rqs",
+        help="Check that every result unit serves a declared research question",
+    )
+    check_rqs_parser.add_argument(
+        "--config",
+        default="project.yaml",
+        help="Path to project.yaml (default: project.yaml)",
+    )
+
     # pdf
     pdf_parser = subparsers.add_parser(
         "pdf",
@@ -442,6 +497,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "init": _cmd_init,
         "compile": _cmd_compile,
         "check": _cmd_check,
+        "check-rqs": _cmd_check_rqs,
         "pdf": _cmd_pdf,
     }
 
