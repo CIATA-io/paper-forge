@@ -416,8 +416,9 @@ to complete a specific task in the paper-writing process.
 
 paper-forge ships a closed-loop reviewer that runs **entirely on Claude Code subagents** —
 no external LLM, no API keys. The referee is a subagent; the gate is paper-forge itself
-(deterministic Python). The assets live under `templates/claude/` (copy into your project's
-`.claude/`):
+(deterministic Python). The agent/skill assets live under `templates/claude/` (copy into your
+project's `.claude/`); the reviewer's **rubric** and the analyst's **charter** are seeded from
+`templates/manuscript/review/` (copy into `manuscript/review/` and tailor to your paper):
 
 | Command | Agent | What it does |
 |---------|-------|--------------|
