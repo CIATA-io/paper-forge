@@ -196,3 +196,20 @@ class TestGitVersionFallback:
         # paper-forge's own repo is a git checkout: live git must win.
         prov = get_git_provenance(Path(__file__).resolve().parents[1])
         assert prov["git_source"] == "git"
+
+    def test_finds_stamp_in_a_parent_directory(self, tmp_path):
+        # A batch runner often launches units from the user's home directory, not the
+        # project root, so the stamp sits below the working directory.
+        (tmp_path / ".git_version").write_text(self.STAMP, encoding="utf-8")
+        nested = tmp_path / "scripts" / "result_units"
+        nested.mkdir(parents=True)
+        prov = get_git_provenance(nested)
+        assert prov["git_commit"] == "9a0fac64fad47b125ee3a9910f72ecf762448dbc"
+        assert prov["git_source"] == "git_version_file"
+
+    def test_nearest_stamp_wins(self, tmp_path):
+        (tmp_path / ".git_version").write_text("outer000\nmain\n", encoding="utf-8")
+        inner = tmp_path / "project"
+        inner.mkdir()
+        (inner / ".git_version").write_text("inner111\ndev\n", encoding="utf-8")
+        assert get_git_provenance(inner)["git_commit"] == "inner111"

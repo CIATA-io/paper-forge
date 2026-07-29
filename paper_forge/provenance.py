@@ -33,16 +33,27 @@ def _read_git_version_file(repo_dir: str | Path | None) -> tuple[str, str] | Non
         git rev-parse --abbrev-ref HEAD >> .git_version
 
     and ship it alongside the code.
+
+    The search walks up from ``repo_dir`` (or the working directory) to the filesystem
+    root, the same way git locates ``.git``. A batch runner typically launches units from
+    the user's home directory rather than the project root, so checking only the starting
+    directory would miss a stamp sitting one level down in the project.
     """
     base = Path(repo_dir) if repo_dir else Path.cwd()
-    stamp = base / GIT_VERSION_FILE
     try:
-        lines = [ln.strip() for ln in stamp.read_text(encoding="utf-8").splitlines()]
-    except (OSError, UnicodeDecodeError):
+        base = base.resolve()
+    except OSError:
         return None
-    if not lines or not lines[0]:
-        return None
-    return lines[0], (lines[1] if len(lines) > 1 and lines[1] else "unknown")
+
+    for directory in (base, *base.parents):
+        stamp = directory / GIT_VERSION_FILE
+        try:
+            lines = [ln.strip() for ln in stamp.read_text(encoding="utf-8").splitlines()]
+        except (OSError, UnicodeDecodeError):
+            continue
+        if lines and lines[0]:
+            return lines[0], (lines[1] if len(lines) > 1 and lines[1] else "unknown")
+    return None
 
 
 def get_git_provenance(repo_dir: str | Path | None = None) -> dict[str, Any]:
