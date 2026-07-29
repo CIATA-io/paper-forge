@@ -57,6 +57,22 @@ Verdicts are resolved by the **interpretation engine** — declare a rule in
 stay pure: they emit numbers, never prose. `paper-forge check` warns on verdicts
 found in template prose; `paper-forge gate` fails on them.
 
+Built-in rule functions are `correlation_effect`, `correlation_qualifier`,
+`comparison` and `significance_stars`. For a verdict they cannot express — a
+multi-branch directionality summary, a Title Case variant for a heading — write a
+function instead of writing prose:
+
+```python
+# scripts/interp_functions.py
+def register(engine):
+    engine.register_function("directionality", directionality)
+```
+
+```yaml
+# project.yaml
+interpretation_functions: scripts/interp_functions.py
+```
+
 Claims about *published work* are static by nature and are exempt — the guard
 skips any sentence carrying a citation. For anything else that is genuinely fixed,
 mark it explicitly:

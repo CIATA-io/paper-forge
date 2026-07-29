@@ -17,6 +17,10 @@ result_units:
 # Remove this line only if the manuscript makes no claims about its own results.
 interpretations: interpretations.yaml
 
+# Verdicts the four built-in functions cannot express: point at a module defining
+# register(engine), and its functions become usable in interpretations.yaml.
+# interpretation_functions: scripts/interp_functions.py
+
 # Guard: no hardcoded numbers in the template. Numbers come from result units.
 literals:
   enforce: false # `paper-forge gate` enforces regardless

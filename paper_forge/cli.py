@@ -54,6 +54,10 @@ result_units:
 # Statistical verdicts are resolved from results at compile time as {{interp.<key>}}.
 interpretations: interpretations.yaml
 
+# For verdicts the built-in functions cannot express, point at a module defining
+# register(engine) and use its functions in interpretations.yaml.
+# interpretation_functions: scripts/interp_functions.py
+
 # Guards. `paper-forge gate` enforces both regardless of these settings.
 literals:
   enforce: false # no hardcoded numbers in the template

@@ -23,6 +23,7 @@ its placeholder prefix::
         "01_analysis": "stats"     # 01_analysis.json -> {{stats.*}}
         "00_demographics": "demo"
     interpretations: interpretations.yaml   # optional rules engine (see interpretation.py)
+    interpretation_functions: scripts/interp_functions.py  # optional; module with register(engine)
     derived:
       my_derived_key: "python_expression"
 """
@@ -37,7 +38,7 @@ from typing import Any
 import yaml
 
 from paper_forge.formatters import FORMATTERS, fmt_raw, set_render_mode
-from paper_forge.interpretation import InterpretationEngine
+from paper_forge.interpretation import InterpretationEngine, load_function_plugin
 from paper_forge.result_unit import load_results
 
 # Regex matching {{prefix.key:formatter}} or {{prefix.key}}
@@ -326,6 +327,12 @@ def compile_manuscript(
     interp_path = config.get("interpretations")
     if interp_path:
         engine = InterpretationEngine()
+        # Custom functions must be registered before load_rules, which rejects a rule
+        # naming a function it does not know.
+        plugin_path = config.get("interpretation_functions")
+        if plugin_path:
+            registered = load_function_plugin(engine, base_dir / plugin_path)
+            print(f"  Registered {len(registered)} custom interpretation function(s)")
         engine.load_rules(base_dir / interp_path)
         interp_results = engine.resolve_all(all_results)
         # Add interpretation results with "interp." prefix

@@ -76,7 +76,7 @@ paper-forge/
 | `literals.py` | Numeric-literal guard: flags hardcoded numbers in the template (`check --strict-literals`) |
 | `claims.py` | Verdict-claim guard: flags statistical verdicts asserted in prose instead of resolved via `{{interp.*}}` (`check --strict-claims`). Exempts cited sentences and `pf-allow-claim` lines |
 | `research_questions.py` | Parses the RQ registry; `check_research_questions()` powers `check-rqs` |
-| `interpretation.py` | Optional `InterpretationEngine` — derives phrases from result values at compile time (enable via `interpretations:` in project.yaml) |
+| `interpretation.py` | Optional `InterpretationEngine` — derives phrases from result values at compile time (enable via `interpretations:` in project.yaml). `load_function_plugin()` lets a project register its own verdict functions via `interpretation_functions:`; it must run before `load_rules()`, which rejects unknown function names |
 | `provenance.py` | `get_git_provenance()` / `get_environment()` — git hash, dirty state, package list |
 | `result_unit.py` | `save_results()` — writes JSON envelope (+ `rq`); `load_results()` — reads JSON |
 | `renderers/` | Wraps pandoc to convert compiled markdown to PDF |

@@ -19,6 +19,7 @@ Example YAML rules::
 
 from __future__ import annotations
 
+import importlib.util
 import math
 from collections.abc import Callable
 from pathlib import Path
@@ -369,3 +370,69 @@ def load_rules(yaml_path: str | Path) -> InterpretationEngine:
     engine = InterpretationEngine()
     engine.load_rules(yaml_path)
     return engine
+
+
+def load_function_plugin(
+    engine: InterpretationEngine,
+    module_path: str | Path,
+) -> list[str]:
+    """Import a project module and let it register custom interpretation functions.
+
+    The four built-ins cover the common shapes, but a real paper usually needs at least
+    one verdict they cannot express — a multi-branch directionality summary, a Title Case
+    variant for a section heading, a domain-specific comparison. Without this hook the
+    only way to phrase those is to type them into the template, which is exactly what the
+    claim guard forbids.
+
+    The module must define ``register(engine)`` and call
+    :meth:`InterpretationEngine.register_function` for each function it provides::
+
+        # scripts/interp_functions.py
+        def directionality(fwd_p, fwd_rho, rev_p, rev_rho):
+            ...
+            return "the effect is unidirectional: dance predicts sleep"
+
+        def register(engine):
+            engine.register_function("directionality", directionality)
+
+    Rules in ``interpretations.yaml`` may then use ``function: directionality``.
+
+    This must run *before* :meth:`InterpretationEngine.load_rules`, which rejects rules
+    naming an unknown function.
+
+    Note that this imports and executes project code, exactly as a build tool's own
+    config file does. The path comes from the project's ``project.yaml``, so it is
+    trusted to the same degree as the analysis scripts beside it.
+
+    Args:
+        engine: Engine to register the functions on.
+        module_path: Path to the Python module providing ``register(engine)``.
+
+    Returns:
+        The names of the functions the module registered, in sorted order.
+
+    Raises:
+        FileNotFoundError: If the module file does not exist.
+        ValueError: If the module cannot be imported or defines no ``register``.
+    """
+    module_path = Path(module_path)
+    if not module_path.exists():
+        raise FileNotFoundError(f"Interpretation function module not found: {module_path}")
+
+    spec = importlib.util.spec_from_file_location(f"_pf_interp_{module_path.stem}", module_path)
+    if spec is None or spec.loader is None:
+        raise ValueError(f"Could not import interpretation function module: {module_path}")
+
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    register = getattr(module, "register", None)
+    if not callable(register):
+        raise ValueError(
+            f"Interpretation function module {module_path} must define "
+            "'register(engine)' — see paper_forge.interpretation.load_function_plugin"
+        )
+
+    before = set(engine.functions)
+    register(engine)
+    return sorted(set(engine.functions) - before)

@@ -106,10 +106,33 @@ rules:
 ```
 
 Built-ins: `correlation_effect`, `correlation_qualifier`, `comparison`,
-`significance_stars`. Anything else — a bespoke multi-branch verdict, a
-directionality summary — is a custom function registered via
-`InterpretationEngine.register_function()`. Write the function; do not write the branch
-into the prose.
+`significance_stars`.
+
+Most papers need at least one verdict those cannot express — a multi-branch
+directionality summary, a Title Case variant for a heading, a domain-specific
+comparison. Write it as a Python function rather than as prose:
+
+```python
+# scripts/interp_functions.py
+def directionality(fwd_p, rev_p, alpha=0.05):
+    fwd, rev = fwd_p < alpha, rev_p < alpha
+    if fwd and rev:
+        return "is bidirectional"
+    if fwd:
+        return "runs one way only: dance drives sleep"
+    ...
+
+def register(engine):
+    engine.register_function("directionality", directionality)
+```
+
+```yaml
+# project.yaml
+interpretation_functions: scripts/interp_functions.py
+```
+
+The rule then uses `function: directionality` like any built-in. Write the function; do
+not write the branch into the prose.
 
 **The rule owns the whole verbal claim, not a fragment.** Fragments recombine wrongly:
 

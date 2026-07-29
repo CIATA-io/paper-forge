@@ -12,9 +12,30 @@ from paper_forge.interpretation import (
     comparison,
     correlation_effect,
     correlation_qualifier,
+    load_function_plugin,
     load_rules,
     significance_stars,
 )
+
+PLUGIN_SOURCE = '''\
+"""Project-supplied interpretation functions."""
+
+
+def directionality(fwd_p, rev_p, alpha=0.05):
+    fwd = fwd_p < alpha
+    rev = rev_p < alpha
+    if fwd and rev:
+        return "both directions are significant"
+    if fwd:
+        return "the effect is unidirectional: forward only"
+    if rev:
+        return "the effect is unidirectional: reverse only"
+    return "neither direction shows a significant effect"
+
+
+def register(engine):
+    engine.register_function("directionality", directionality)
+'''
 
 
 class TestCorrelationEffect:
@@ -256,3 +277,73 @@ class TestInterpretationEngine:
         engine = load_rules(rules_yaml)
         assert isinstance(engine, InterpretationEngine)
         assert len(engine.rules) == 2
+
+
+class TestFunctionPlugin:
+    """Project-supplied interpretation functions (``interpretation_functions:``)."""
+
+    @pytest.fixture
+    def plugin(self, tmp_path: Path) -> Path:
+        path = tmp_path / "interp_functions.py"
+        path.write_text(PLUGIN_SOURCE, encoding="utf-8")
+        return path
+
+    def test_registers_and_reports_new_functions(self, plugin: Path):
+        engine = InterpretationEngine()
+        assert load_function_plugin(engine, plugin) == ["directionality"]
+        assert "directionality" in engine.functions
+
+    def test_builtins_survive_registration(self, plugin: Path):
+        engine = InterpretationEngine()
+        load_function_plugin(engine, plugin)
+        assert "correlation_effect" in engine.functions
+
+    def test_registered_function_resolves_through_a_rule(self, plugin: Path, tmp_path: Path):
+        rules = {
+            "rules": {
+                "direction": {
+                    "function": "directionality",
+                    "output_key": "direction",
+                    "args": {"fwd_p_key": "temp.fwd_p", "rev_p_key": "temp.rev_p"},
+                }
+            }
+        }
+        rules_path = tmp_path / "rules.yaml"
+        rules_path.write_text(yaml.dump(rules), encoding="utf-8")
+
+        engine = InterpretationEngine()
+        load_function_plugin(engine, plugin)
+        engine.load_rules(rules_path)
+
+        out = engine.resolve_all({"temp.fwd_p": 0.001, "temp.rev_p": 0.9})
+        assert out["direction"] == "the effect is unidirectional: forward only"
+
+    def test_plugin_must_be_registered_before_load_rules(self, plugin: Path, tmp_path: Path):
+        # load_rules validates function names, so the reverse order fails. This ordering
+        # is a real constraint on the compiler, not an implementation detail.
+        rules = {"rules": {"direction": {"function": "directionality"}}}
+        rules_path = tmp_path / "rules.yaml"
+        rules_path.write_text(yaml.dump(rules), encoding="utf-8")
+
+        engine = InterpretationEngine()
+        with pytest.raises(ValueError, match="directionality"):
+            engine.load_rules(rules_path)
+
+    def test_missing_module_raises_filenotfound(self, tmp_path: Path):
+        engine = InterpretationEngine()
+        with pytest.raises(FileNotFoundError, match="not found"):
+            load_function_plugin(engine, tmp_path / "nope.py")
+
+    def test_module_without_register_raises(self, tmp_path: Path):
+        path = tmp_path / "no_register.py"
+        path.write_text("def helper():\n    return 1\n", encoding="utf-8")
+        engine = InterpretationEngine()
+        with pytest.raises(ValueError, match="register"):
+            load_function_plugin(engine, path)
+
+    def test_non_callable_register_raises(self, tmp_path: Path):
+        path = tmp_path / "bad_register.py"
+        path.write_text("register = 42\n", encoding="utf-8")
+        engine = InterpretationEngine()
+        with pytest.raises(ValueError, match="register"):
+            load_function_plugin(engine, path)
