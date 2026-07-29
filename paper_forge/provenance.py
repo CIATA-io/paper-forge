@@ -15,8 +15,41 @@ from pathlib import Path
 from typing import Any
 
 
+GIT_VERSION_FILE = ".git_version"
+
+
+def _read_git_version_file(repo_dir: str | Path | None) -> tuple[str, str] | None:
+    """Read a ``.git_version`` stamp: commit SHA on line 1, branch on line 2.
+
+    Heavy analyses commonly run on a compute host that receives the code by rsync or
+    scp, so there is no ``.git`` directory there and ``git rev-parse`` returns nothing.
+    Without a fallback every result produced on that host records
+    ``git_commit: "unknown"`` — silently losing the provenance that is the whole point
+    of the envelope, and losing it precisely for the expensive runs.
+
+    Write the file on the machine that *does* have the repository::
+
+        git rev-parse HEAD > .git_version
+        git rev-parse --abbrev-ref HEAD >> .git_version
+
+    and ship it alongside the code.
+    """
+    base = Path(repo_dir) if repo_dir else Path.cwd()
+    stamp = base / GIT_VERSION_FILE
+    try:
+        lines = [ln.strip() for ln in stamp.read_text(encoding="utf-8").splitlines()]
+    except (OSError, UnicodeDecodeError):
+        return None
+    if not lines or not lines[0]:
+        return None
+    return lines[0], (lines[1] if len(lines) > 1 and lines[1] else "unknown")
+
+
 def get_git_provenance(repo_dir: str | Path | None = None) -> dict[str, Any]:
     """Capture git state of the current or specified repository.
+
+    Falls back to a ``.git_version`` stamp file when the directory is not a git
+    checkout, so results computed on an rsync-based compute host keep their provenance.
 
     Args:
         repo_dir: Path to the git repository. If None, uses the current
@@ -28,6 +61,7 @@ def get_git_provenance(repo_dir: str | Path | None = None) -> dict[str, Any]:
             - ``git_branch``: Current branch name
             - ``git_dirty``: Whether there are uncommitted changes
             - ``git_label``: Human-readable label like ``'abc1234 (main, dirty)'``
+            - ``git_source``: ``"git"``, ``"git_version_file"``, or ``"unavailable"``
 
     Examples:
         >>> prov = get_git_provenance()
@@ -53,6 +87,16 @@ def get_git_provenance(repo_dir: str | Path | None = None) -> dict[str, Any]:
     branch = _git("rev-parse", "--abbrev-ref", "HEAD")
     dirty_output = _git("status", "--porcelain")
     dirty = bool(dirty_output)
+    source = "git" if commit else "unavailable"
+
+    if not commit:
+        stamped = _read_git_version_file(repo_dir)
+        if stamped:
+            commit, branch = stamped
+            source = "git_version_file"
+            # A stamp cannot know whether the shipped tree was edited after it was
+            # written, so dirtiness is unknown rather than clean.
+            dirty = False
 
     # Build human-readable label
     short_sha = commit[:7] if commit else "unknown"
@@ -61,6 +105,10 @@ def get_git_provenance(repo_dir: str | Path | None = None) -> dict[str, Any]:
         parts.append(branch)
     if dirty:
         parts.append("dirty")
+    if source == "git_version_file":
+        # Flag it in the label: a stamped commit says which code was *shipped*, which is
+        # weaker evidence than a live checkout and should not read as if it were one.
+        parts.append("stamped")
     label = f"{parts[0]} ({', '.join(parts[1:])})" if len(parts) > 1 else parts[0]
 
     return {
@@ -68,6 +116,7 @@ def get_git_provenance(repo_dir: str | Path | None = None) -> dict[str, Any]:
         "git_branch": branch or "unknown",
         "git_dirty": dirty,
         "git_label": label,
+        "git_source": source,
     }
 
 

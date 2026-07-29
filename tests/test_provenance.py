@@ -158,3 +158,41 @@ class TestGetEnvironment:
     def test_packages_is_dict(self):
         env = get_environment()
         assert isinstance(env["packages"], dict)
+
+
+class TestGitVersionFallback:
+    """`.git_version` stamp fallback for rsync-based compute hosts (no .git dir)."""
+
+    STAMP = "9a0fac64fad47b125ee3a9910f72ecf762448dbc\nmain\n"
+
+    def test_reads_stamp_when_not_a_git_checkout(self, tmp_path):
+        (tmp_path / ".git_version").write_text(self.STAMP, encoding="utf-8")
+        prov = get_git_provenance(tmp_path)
+        assert prov["git_commit"] == "9a0fac64fad47b125ee3a9910f72ecf762448dbc"
+        assert prov["git_branch"] == "main"
+        assert prov["git_source"] == "git_version_file"
+
+    def test_label_marks_a_stamped_commit(self, tmp_path):
+        (tmp_path / ".git_version").write_text(self.STAMP, encoding="utf-8")
+        # A shipped-code stamp is weaker evidence than a live checkout; say so.
+        assert "stamped" in get_git_provenance(tmp_path)["git_label"]
+
+    def test_missing_branch_line_is_tolerated(self, tmp_path):
+        (tmp_path / ".git_version").write_text("abc123\n", encoding="utf-8")
+        prov = get_git_provenance(tmp_path)
+        assert prov["git_commit"] == "abc123"
+        assert prov["git_branch"] == "unknown"
+
+    def test_no_stamp_and_no_git_reports_unavailable(self, tmp_path):
+        prov = get_git_provenance(tmp_path)
+        assert prov["git_commit"] == "unknown"
+        assert prov["git_source"] == "unavailable"
+
+    def test_empty_stamp_is_ignored(self, tmp_path):
+        (tmp_path / ".git_version").write_text("\n\n", encoding="utf-8")
+        assert get_git_provenance(tmp_path)["git_source"] == "unavailable"
+
+    def test_real_checkout_is_not_overridden_by_a_stamp(self):
+        # paper-forge's own repo is a git checkout: live git must win.
+        prov = get_git_provenance(Path(__file__).resolve().parents[1])
+        assert prov["git_source"] == "git"
