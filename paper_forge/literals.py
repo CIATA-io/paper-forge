@@ -49,7 +49,8 @@ _ALLOW_COMMENT = re.compile(r"<!--\s*pf-allow-literal\b")
 _FENCE = re.compile(r"^\s*(?:```|~~~)")
 _HEADING_NUM = re.compile(r"^(#{1,6})\s+(\d+(?:\.\d+)*)\b")
 _ORDERED_LIST = re.compile(r"^\s*(\d+)[.)]\s")  # markdown ordered-list marker "1. " / "2) "
-_REFERENCES = re.compile(r"^#{1,6}\s+(?:\d+\.?\s+)?references\b", re.IGNORECASE)
+_REFERENCES = re.compile(r"^(#{1,6})\s+(?:\d+\.?\s+)?references\b", re.IGNORECASE)
+_HEADING = re.compile(r"^(#{1,6})\s+")
 _FRONTMATTER_FENCE = "---"
 
 
@@ -88,7 +89,7 @@ def find_literal_numbers(
 
     in_frontmatter = False
     in_code = False
-    in_references = False
+    references_level: int | None = None
 
     for line_num, raw in enumerate(content.splitlines(), start=1):
         stripped = raw.strip()
@@ -102,11 +103,20 @@ def find_literal_numbers(
                 in_frontmatter = False
             continue
 
-        # References section: everything from the heading onward is bibliography.
-        if _REFERENCES.match(stripped):
-            in_references = True
-        if in_references:
-            continue
+        # References section: bibliography is skipped, but only until the next heading at
+        # the same or a higher level. Skipping to end-of-file would also skip the
+        # Supplementary Information and Figure Legends that conventionally follow it.
+        heading = _HEADING.match(stripped)
+        if references_level is not None:
+            if heading and len(heading.group(1)) <= references_level:
+                references_level = None
+            else:
+                continue
+        if references_level is None:
+            ref = _REFERENCES.match(stripped)
+            if ref:
+                references_level = len(ref.group(1))
+                continue
 
         # Fenced code blocks.
         if _FENCE.match(raw):
