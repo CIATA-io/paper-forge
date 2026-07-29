@@ -1,0 +1,52 @@
+# Interpretation rules — where every statistical VERDICT in the manuscript comes from.
+#
+# The template supplies numbers via {{prefix.key:formatter}}. It must never supply the
+# *claim about* those numbers ("significant", "does not differ", "stronger than"). Each
+# rule below turns raw statistics into a verbal phrase at compile time, exposed to the
+# template as {{interp.<output_key>}}.
+#
+# Why this file exists: prose written by hand freezes the verdict that held on the day it
+# was written. Re-run the analysis with a new threshold or an extra season and the numbers
+# update while the sentence around them silently does not. Routing verdicts through here
+# means a result that flips flips the prose with it.
+#
+# Wire it up in project.yaml:
+#     interpretations: interpretations.yaml
+#
+# Built-in functions (see paper_forge/interpretation.py):
+#   correlation_effect(p, rho, pos_verb, neg_verb, alpha) -> "significantly increases"
+#   correlation_qualifier(p, rho, alpha)                  -> "This strong positive effect"
+#   comparison(p1, rho1, p2, rho2, label1, label2)        -> compares two effects
+#   significance_stars(p)                                 -> "***" / "**" / "*" / "n.s."
+#
+# Register project-specific functions with InterpretationEngine.register_function().
+#
+# Argument convention: a parameter suffixed `_key` is looked up in the results
+# (prefix.key); anything else is passed through as a literal.
+
+rules:
+  # {{interp.main_effect}} → "significantly outscored" / "does not significantly change"
+  main_effect:
+    function: correlation_effect
+    output_key: main_effect
+    args:
+      p_key: ex.main_p
+      rho_key: ex.effect_size
+      pos_verb: outscored
+      neg_verb: underscored
+
+  # {{interp.main_qualifier}} → "This moderate positive effect" / "This non-significant result"
+  # Opens a Discussion sentence without you asserting the strength yourself.
+  main_qualifier:
+    function: correlation_qualifier
+    output_key: main_qualifier
+    args:
+      p_key: ex.main_p
+      rho_key: ex.effect_size
+
+  # {{interp.main_stars}} → "***" / "**" / "*" / "n.s." for tables and inline reporting.
+  main_stars:
+    function: significance_stars
+    output_key: main_stars
+    args:
+      p_key: ex.main_p

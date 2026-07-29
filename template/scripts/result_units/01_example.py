@@ -44,56 +44,16 @@ def main() -> None:
 
     # Derived quantities -------------------------------------------------
     n_total = n1 + n2
-    direction = "higher" if np.median(treatment_scores) > np.median(control_scores) else "lower"
-    is_significant = p_value < 0.05
-
-    if abs(effect_size) < 0.1:
-        effect_magnitude = "negligible"
-    elif abs(effect_size) < 0.3:
-        effect_magnitude = "small"
-    elif abs(effect_size) < 0.5:
-        effect_magnitude = "medium"
-    else:
-        effect_magnitude = "large"
-
-    significance_descriptor = "significant" if is_significant else "non-significant"
-    conclusion_verb = "supports" if is_significant else "does not support"
-
-    # Interpretation text (generated from p-value) -----------------------
-    if p_value < 0.001:
-        main_interp = (
-            "The difference between groups was highly significant, "
-            "providing strong evidence for a treatment effect."
-        )
-    elif p_value < 0.01:
-        main_interp = (
-            "The difference between groups was significant, "
-            "providing clear evidence for a treatment effect."
-        )
-    elif p_value < 0.05:
-        main_interp = (
-            "The difference between groups was significant, suggesting a treatment effect."
-        )
-    else:
-        main_interp = (
-            "The difference between groups was not statistically significant, "
-            "providing insufficient evidence for a treatment effect."
-        )
-
-    # Exclusion note (example of conditional prose) ----------------------
     n_excluded = 0  # No exclusions in this mock dataset
-    if n_excluded > 0:
-        exclusion_note = (
-            f"{n_excluded} participants were excluded due to incomplete data, "
-            f"leaving {n_total} for analysis."
-        )
-    else:
-        exclusion_note = "No participants were excluded from the analysis."
+
+    # NOTE: no prose here, by design. A result unit emits numbers; the verbal
+    # verdict ("significant", "supports the hypothesis") is decided at compile
+    # time by interpretations.yaml. Writing the phrasing here would freeze the
+    # verdict that held on the day this ran — the p-value below would keep
+    # updating while the sentence quoting it did not.
 
     # Build results dict -------------------------------------------------
     results = {
-        # Metadata
-        "title_modifier": "Preliminary",
         # Sample sizes
         "n_total": n_total,
         "n_treatment": n1,
@@ -109,13 +69,6 @@ def main() -> None:
         "u_statistic": float(u_stat),
         "main_p": float(p_value),
         "effect_size": float(effect_size),
-        # Derived text
-        "direction": direction,
-        "effect_magnitude": effect_magnitude,
-        "significance_descriptor": significance_descriptor,
-        "conclusion_verb": conclusion_verb,
-        "main_interp": main_interp,
-        "exclusion_note": exclusion_note,
         # Additional
         "response_rate": n_total / (n_total + n_excluded),
     }

@@ -1,5 +1,5 @@
 ---
-title: "A {{ex.title_modifier}} Analysis of Treatment Effects in a Controlled Experiment"
+title: "Analysis of Treatment Effects in a Controlled Experiment"
 author:
   - name: "Author One"
     affiliation: "Department of Science, University of Examples"
@@ -9,11 +9,9 @@ date: "2026"
 abstract: |
   We investigated treatment effects in a sample of {{ex.n_total:int}} subjects
   randomly assigned to treatment (n = {{ex.n_treatment:int}}) and control
-  (n = {{ex.n_control:int}}) groups. The treatment group showed
-  {{ex.direction}} scores compared to controls
+  (n = {{ex.n_control:int}}) groups. The treatment {{interp.main_effect}}
+  the outcome relative to controls
   (effect size r = {{ex.effect_size:r}}, {{ex.main_p:p}}).
-  {{ex.main_interp}}
-  These findings {{ex.conclusion_verb}} the hypothesized treatment effect.
 keywords:
   - reproducible research
   - statistical analysis
@@ -37,13 +35,12 @@ compared to a control condition.
 We recruited {{ex.n_total:int}} participants from the university subject pool.
 Participants were randomly assigned to either the treatment group
 (n = {{ex.n_treatment:int}}) or the control group (n = {{ex.n_control:int}}).
-{{ex.exclusion_note}}
 
 ## Procedure
 
 Each participant completed a standardized assessment battery before and after
 the intervention period. The treatment group received the experimental
-intervention over a 4-week period, while the control group received a
+intervention over a 4-week period, while the control group received a <!-- pf-allow-literal: study protocol, fixed by design -->
 placebo intervention matched for duration and contact time.
 
 ## Statistical Analysis
@@ -52,19 +49,16 @@ Group differences were assessed using a Mann–Whitney U test due to the
 non-normal distribution of outcome scores. Effect sizes are reported as
 rank-biserial correlation (r). All analyses were conducted in Python using
 the paper-forge reproducible pipeline. The significance threshold was set
-at α = 0.05.
+at α = 0.05. <!-- pf-allow-literal: the alpha this analysis declares -->
 
 # Results
 
 ## Primary Outcome
 
-The treatment group (Mdn = {{ex.median_treatment:fmt2}}) scored
-{{ex.direction}} than the control group
-(Mdn = {{ex.median_control:fmt2}}).
-A Mann–Whitney U test revealed a {{ex.significance_descriptor}} difference
-between groups (U = {{ex.u_statistic:fmt1}}, {{ex.main_p:p}},
-r = {{ex.effect_size:r}}).
-{{ex.main_interp}}
+A Mann–Whitney U test showed that the treatment
+(Mdn = {{ex.median_treatment:fmt2}}) {{interp.main_effect}} the control group
+(Mdn = {{ex.median_control:fmt2}}; U = {{ex.u_statistic:fmt1}}, {{ex.main_p:p}},
+r = {{ex.effect_size:r}}, {{interp.main_stars}}).
 
 ## Descriptive Statistics
 
@@ -75,8 +69,8 @@ The overall response rate was {{ex.response_rate:pct}}.
 
 # Discussion
 
-{{ex.main_interp}} The observed effect size of {{ex.effect_size:r}} suggests
-a {{ex.effect_magnitude}} practical impact.
+{{interp.main_qualifier}}, with an observed effect size of
+{{ex.effect_size:r}}, frames how much practical impact to expect.
 
 These results are consistent with prior work showing that targeted
 interventions can produce measurable changes in the outcome variable.
@@ -91,9 +85,9 @@ effects. Future studies should consider larger samples.
 
 # Conclusion
 
-This study {{ex.conclusion_verb}} the hypothesized treatment effect using
-a rigorous, fully reproducible analysis pipeline. All numbers reported in
-this manuscript were generated directly from analysis code, ensuring
-zero transcription errors.
+Tested against the hypothesized treatment effect, the analysis found that the
+treatment {{interp.main_effect}} the outcome. All numbers and every verdict in
+this manuscript were generated directly from analysis code, ensuring zero
+transcription errors.
 
 # References

@@ -52,8 +52,6 @@ class TestResultUnitOutput:
         "u_statistic",
         "main_p",
         "effect_size",
-        "direction",
-        "main_interp",
     ]
 
     def test_all_required_keys_present(self, example_results):
@@ -79,14 +77,15 @@ class TestResultUnitOutput:
         results = example_results.get("results", example_results)
         assert -1.0 <= results["effect_size"] <= 1.0
 
-    def test_direction_is_valid(self, example_results):
-        results = example_results.get("results", example_results)
-        assert results["direction"] in ("higher", "lower")
+    def test_unit_emits_no_prose(self, example_results):
+        """A result unit emits numbers; verdicts belong in interpretations.yaml.
 
-    def test_interpretation_is_nonempty(self, example_results):
+        A string value here would freeze a verdict at the data that produced it, which
+        is the drift paper-forge exists to prevent.
+        """
         results = example_results.get("results", example_results)
-        assert isinstance(results["main_interp"], str)
-        assert len(results["main_interp"]) > 10
+        prose = {k: v for k, v in results.items() if isinstance(v, str)}
+        assert not prose, f"Result unit emitted prose values: {sorted(prose)}"
 
     def test_standard_deviations_positive(self, example_results):
         results = example_results.get("results", example_results)

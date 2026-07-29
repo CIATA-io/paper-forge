@@ -51,6 +51,18 @@ result_units:
   prefix_map:
     "01_example": "ex"
 
+# Statistical verdicts are resolved from results at compile time as {{interp.<key>}}.
+interpretations: interpretations.yaml
+
+# Guards. `paper-forge gate` enforces both regardless of these settings.
+literals:
+  enforce: false # no hardcoded numbers in the template
+  allow: []
+claims:
+  enforce: false # no hardcoded verdicts in the template
+  allow: []
+  extra_patterns: []
+
 execution:
   python: "uv run python"
 
@@ -63,6 +75,47 @@ rendering:
             encoding="utf-8",
         )
         print(f"  Created {config_path}")
+
+    # Create interpretations.yaml — where statistical verdicts come from
+    interp_path = project_dir / "interpretations.yaml"
+    if not interp_path.exists():
+        interp_path.write_text(
+            """\
+# Interpretation rules — the only place a statistical VERDICT may be decided.
+#
+# The template supplies numbers via {{prefix.key:formatter}}. It must never supply the
+# claim *about* those numbers ("significant", "does not differ", "stronger than"): prose
+# written by hand freezes the verdict that held the day it was typed, and the number
+# beside it keeps updating while the sentence does not.
+#
+# Each rule turns raw statistics into a phrase at compile time, used as {{interp.<key>}}.
+#
+# Built-ins: correlation_effect, correlation_qualifier, comparison, significance_stars.
+# Register your own with InterpretationEngine.register_function().
+# A parameter suffixed `_key` is looked up in the results; anything else is a literal.
+
+rules:
+  # {{interp.main_effect}} → "significantly reduces" / "does not significantly change"
+  main_effect:
+    function: correlation_effect
+    output_key: main_effect
+    args:
+      p_key: ex.p_value
+      rho_key: ex.effect
+      pos_verb: increases
+      neg_verb: reduces
+
+  # {{interp.main_qualifier}} → "This moderate negative effect" / "This non-significant result"
+  main_qualifier:
+    function: correlation_qualifier
+    output_key: main_qualifier
+    args:
+      p_key: ex.p_value
+      rho_key: ex.effect
+""",
+            encoding="utf-8",
+        )
+        print(f"  Created {interp_path}")
 
     # Create manuscript template
     manuscript_path = project_dir / "manuscript" / "manuscript_template.md"
@@ -88,12 +141,12 @@ We collected {{ex.n_samples:int}} samples and analyzed them using...
 
 # Results
 
-The main effect was {{ex.effect:r}} (p = {{ex.p_value:p}}, {{ex.p_value:stars}}).
-{{ex.main_interp}}
+The treatment {{interp.main_effect}} the outcome
+(r = {{ex.effect:r}}, p = {{ex.p_value:p}}, {{ex.p_value:stars}}).
 
 # Discussion
 
-{{ex.main_interp}} These findings suggest...
+{{interp.main_qualifier}} is consistent with...
 
 # References
 """,
@@ -135,11 +188,13 @@ RESULTS_DIR = REPO_ROOT / "manuscript" / "results"
 
 def main() -> None:
     # Your analysis here...
+    # Emit numbers only. Verdicts ("significantly reduced") belong in
+    # interpretations.yaml, so they are re-decided from the data on every run
+    # instead of frozen into a string here.
     results = {
         "n_samples": 150,
         "p_value": 0.003,
         "effect": -0.42,
-        "main_interp": "The treatment significantly reduced the outcome.",
     }
 
     save_results("01_example", results, output_dir=RESULTS_DIR)
@@ -263,8 +318,38 @@ def _check_literals(config_path: str, strict_literals: bool) -> int:
     return 1 if enforce else 0
 
 
+def _check_claims(config_path: str, strict_claims: bool) -> int:
+    """Run the verdict-claim guard on the template. Returns an exit code delta."""
+    from paper_forge.claims import check_claims, format_findings
+    from paper_forge.compiler import load_project_config
+
+    config = load_project_config(config_path)
+    template_path = Path(config_path).parent / config["manuscript"]
+    claim_cfg = config.get("claims", {}) or {}
+    findings = check_claims(
+        template_path,
+        allow=claim_cfg.get("allow", []),
+        extra_patterns=claim_cfg.get("extra_patterns", []),
+    )
+
+    if not findings:
+        print("  No unbacked statistical verdicts in the template.")
+        return 0
+
+    enforce = strict_claims or bool(claim_cfg.get("enforce", False))
+    label = "ERROR" if enforce else "WARNING"
+    print(
+        f"\n  {label}: {len(findings)} statistical verdict(s) asserted in template prose — "
+        "a verdict must come from an {{interp.*}} placeholder so it tracks the data "
+        "(or mark it with '<!-- pf-allow-claim: reason -->'):",
+        file=sys.stderr,
+    )
+    print(format_findings(findings), file=sys.stderr)
+    return 1 if enforce else 0
+
+
 def _cmd_check(args: argparse.Namespace) -> int:
-    """Check placeholders (and, unless disabled, hardcoded numeric literals)."""
+    """Check placeholders (and, unless disabled, hardcoded literals and verdicts)."""
     from paper_forge.compiler import compile_manuscript
 
     exit_code = 0
@@ -285,6 +370,13 @@ def _cmd_check(args: argparse.Namespace) -> int:
             exit_code |= _check_literals(args.config, args.strict_literals)
         except Exception as e:
             print(f"ERROR (literal check): {e}", file=sys.stderr)
+            return 1
+
+    if not getattr(args, "no_claims", False):
+        try:
+            exit_code |= _check_claims(args.config, getattr(args, "strict_claims", False))
+        except Exception as e:
+            print(f"ERROR (claim check): {e}", file=sys.stderr)
             return 1
 
     return exit_code
@@ -358,6 +450,13 @@ def _cmd_gate(args: argparse.Namespace) -> int:
         rc |= _check_literals(args.config, strict_literals=True)
     except Exception as e:
         print(f"ERROR (literal check): {e}", file=sys.stderr)
+        rc = 1
+
+    print("  [gate] verdict-claim guard ...")
+    try:
+        rc |= _check_claims(args.config, strict_claims=True)
+    except Exception as e:
+        print(f"ERROR (claim check): {e}", file=sys.stderr)
         rc = 1
 
     # Research-question check — only when a registry is present.
@@ -489,6 +588,18 @@ def build_parser() -> argparse.ArgumentParser:
         "--no-literals",
         action="store_true",
         help="Skip the numeric-literal guard entirely.",
+    )
+    check_parser.add_argument(
+        "--strict-claims",
+        action="store_true",
+        help="Treat statistical verdicts asserted in template prose as errors "
+        "(non-zero exit), not just warnings. Also settable via 'claims.enforce' "
+        "in project.yaml.",
+    )
+    check_parser.add_argument(
+        "--no-claims",
+        action="store_true",
+        help="Skip the verdict-claim guard entirely.",
     )
 
     # check-rqs

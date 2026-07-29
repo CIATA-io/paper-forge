@@ -13,6 +13,21 @@ result_units:
   prefix_map:
     "01_example": "ex"
 
+# Statistical verdicts are resolved here at compile time and used as {{interp.<key>}}.
+# Remove this line only if the manuscript makes no claims about its own results.
+interpretations: interpretations.yaml
+
+# Guard: no hardcoded numbers in the template. Numbers come from result units.
+literals:
+  enforce: false # `paper-forge gate` enforces regardless
+  allow: [] # regexes for legitimate constants (apparatus, protocol)
+
+# Guard: no hardcoded verdicts in the template. Verdicts come from {{interp.*}}.
+claims:
+  enforce: false # `paper-forge gate` enforces regardless
+  allow: [] # regexes for claims that are genuinely static
+  extra_patterns: [] # project-specific verdict vocabulary to also catch
+
 execution:
   python: "uv run python"
 

@@ -1,164 +1,242 @@
-# `/draft_template` — Draft Manuscript Template from Results
+# `/draft_template` — Author the Manuscript Template
 
-> Generate a complete manuscript template by reading existing result JSONs and
-> wiring up placeholders. This workflow is ideal when result units already exist
-> and you need to build or rebuild the manuscript template.
+> Write `manuscript/manuscript_template.md` from the research questions and the result
+> units. The output is a template: prose whose every number and every verdict is a
+> placeholder, so the manuscript re-derives itself whenever the analysis changes.
 
-## Phase 1: Inventory Results
+You are drafting **Layer 2**. Layers 1 (result units) and 3 (the compiler) already exist.
+Your job is the prose that connects them — and the one way to get it wrong that no
+downstream check used to catch.
 
-1. List all available result JSONs:
-   ```bash
-   ls -la manuscript/results/*.json
-   ```
-
-2. For each JSON, extract the available keys:
-   ```bash
-   for f in manuscript/results/*.json; do
-     echo "=== $(basename $f) ==="
-     uv run python -c "
-   import json
-   with open('$f') as fh:
-       data = json.load(fh)
-       results = data.get('results', data)
-       for k, v in sorted(results.items()):
-           print(f'  {k}: {type(v).__name__} = {repr(v)[:60]}')
-   "
-   done
-   ```
-
-3. Read the prefix map from `project.yaml`:
-   ```bash
-   cat project.yaml
-   ```
-
-4. Build a mapping table:
-
-   | JSON file | Prefix | Available keys |
-   |-----------|--------|----------------|
-   | 01_population.json | pop | n_total, n_deprived, ... |
-   | 02_temporal.json | temp | n_morning, temporal_p, ... |
-
-## Phase 2: Check for Research Questions
-
-5. If `research_questions.yaml` exists, read it for structure guidance:
-   ```bash
-   cat research_questions.yaml 2>/dev/null || echo "No research_questions.yaml found"
-   ```
-
-   Expected format:
-   ```yaml
-   questions:
-     - id: RQ1
-       text: "Does sleep deprivation affect dance accuracy?"
-       result_units: ["01_population"]
-     - id: RQ2
-       text: "Does the effect vary with time of day?"
-       result_units: ["02_temporal"]
-   ```
-
-## Phase 3: Generate Template
-
-6. Create `manuscript/manuscript_template.md` with this structure:
-
-### YAML Front Matter
-```markdown
 ---
-title: "Paper Title"
-author:
-  - name: "Author"
-    affiliation: "Institution"
-abstract: |
-  Summary with key numbers: {{prefix.key:formatter}}
+
+## The rule that matters most
+
+**A verdict is not yours to write.**
+
+A *verdict* is any claim whose truth depends on a statistic: "significant", "did not
+differ", "predicts", "stronger than", "no association". You will have the result JSONs
+open while you draft. It is natural to read `p = 0.031`, judge it marginal, and write
+"dancers did not differ appreciably from controls." That sentence is now **frozen at
+today's data**. Change the stillness threshold, add a season, fix a bug upstream — the
+p-value next to it updates, because it is a placeholder, and the claim around it does not.
+
+This is not a hypothetical failure. It is why paper-forge exists.
+
+So:
+
+> **Read result values to learn which keys exist. Never to decide what to claim.**
+
+A useful self-test while drafting each sentence:
+
+> *If this p-value crossed 0.05 tomorrow, would I have to re-word this sentence?*
+
+If yes, the wording must come from an interpretation rule, not from you.
+
 ---
+
+## Phase 1 — Scope: read the research questions first
+
+The RQ registry, not the results directory, defines what the paper argues.
+
+```bash
+cat manuscript/research_questions.md
 ```
 
-### Section Guidelines
+Build the spine before writing a word of prose:
 
-**Introduction:**
-- Static text — no placeholders needed
-- End with clear hypotheses
+| RQ | Question | Status | Units |
+|----|----------|--------|-------|
+| RQ1 | … | open | 01_population |
 
-**Methods:**
-- Mostly static text
-- Use placeholders for sample sizes: `{{pop.n_total:int}}`
-- Describe statistical methods
+Rules:
 
-**Results:**
-- Heavy use of placeholders
-- Pattern for each test:
-  ```markdown
-  Group A (Mdn = {{prefix.median_a:fmt2}}) differed from
-  Group B (Mdn = {{prefix.median_b:fmt2}};
-  U = {{prefix.u_stat:fmt1}}, {{prefix.p_value:p}},
-  r = {{prefix.effect_size:r}}).
-  {{prefix.interp}}
-  ```
+- Every `open` / `answered` question gets reported. A question with no home in the
+  manuscript is a gap — say so rather than quietly dropping it.
+- Every claim you write traces to exactly one RQ. If you cannot name the RQ a sentence
+  serves, the sentence is scope creep — cut it.
+- Do **not** add research questions to fit results you find interesting. Growing scope is
+  a deliberate edit to the registry, by a human.
+- Units declaring `rq="methods"` are descriptive; they populate Methods, not Results.
 
-**Discussion:**
-- Use interpretation placeholders to echo key findings
-- Reference effect sizes: `{{prefix.effect_size:r}}`
+## Phase 2 — Inventory the result units by *schema*
 
-## Phase 4: Wire Up Interpretation Rules
+You need the key names and types. You do not need to internalise the values.
 
-7. For each p-value in a result unit, ensure there is a corresponding
-   interpretation key that generates text based on the statistical result.
+```bash
+for f in manuscript/results/*.json; do
+  echo "=== $(basename "$f") ==="
+  uv run python -c "
+import json, sys
+with open(sys.argv[1]) as fh:
+    d = json.load(fh).get('results', {})
+for k, v in sorted(d.items()):
+    print(f'  {k}: {type(v).__name__}')
+" "$f"
+done
+```
 
-8. Common interpretation patterns:
-   ```python
-   # In the result unit:
-   if p < 0.001:
-       interp = "The effect was highly significant..."
-   elif p < 0.05:
-       interp = "The effect was significant..."
-   else:
-       interp = "No significant effect was observed..."
-   ```
+This deliberately prints types, not values — it is the schema you are wiring to. When you
+do need a value (deciding whether a table row exists at all, say), read it, then
+consciously set it aside before writing the sentence.
 
-9. For each interpretation placeholder in the template, verify the result
-   unit generates the text dynamically (not hardcoded).
+Map each unit to its placeholder prefix from `project.yaml`:
 
-## Phase 5: Compile and Validate
+| JSON | Prefix | Keys | Serves RQ |
+|------|--------|------|-----------|
+| 01_population.json | pop | n_total, … | methods |
 
-10. Run validation:
-    ```bash
-    make check
-    ```
+## Phase 3 — Declare interpretation rules *before* writing prose
 
-11. Fix any issues:
-    - **Missing key**: Add the key to the result unit, or remove the placeholder
-    - **Orphaned key**: Result exists but no placeholder uses it (warning only)
-    - **Wrong prefix**: Check `project.yaml` prefix map
+This ordering is the point. You cannot write "dance significantly predicts sleep" if the
+only way to say it is `{{interp.dance_sleep}}` and that rule does not exist yet.
 
-12. Compile:
-    ```bash
-    make compile
-    ```
+For every verdict the paper needs, add a rule to `interpretations.yaml`:
 
-13. Review the compiled output:
-    ```bash
-    cat manuscript/manuscript.md
-    ```
+```yaml
+rules:
+  dance_sleep:
+    function: correlation_effect
+    output_key: dance_sleep
+    args:
+      p_key: temp.wb_p
+      rho_key: temp.wb_rho
+      pos_verb: predicts more
+      neg_verb: predicts less
+```
 
-14. Check for:
-    - [ ] All `{{...}}` placeholders replaced
-    - [ ] Numbers formatted correctly
-    - [ ] Interpretation text reads naturally
-    - [ ] No duplicate or contradictory statements
-    - [ ] Logical flow between sections
+Built-ins: `correlation_effect`, `correlation_qualifier`, `comparison`,
+`significance_stars`. Anything else — a bespoke multi-branch verdict, a
+directionality summary — is a custom function registered via
+`InterpretationEngine.register_function()`. Write the function; do not write the branch
+into the prose.
 
-## Phase 6: Render and Review
+**The rule owns the whole verbal claim, not a fragment.** Fragments recombine wrongly:
 
-15. Generate PDF:
-    ```bash
-    make pdf
-    ```
+```markdown
+<!-- WRONG — "is" + a verb phrase is ungrammatical the moment the verdict flips -->
+The reverse effect is {{interp.reverse}}: sleep → dance.
 
-16. Review the PDF for formatting issues.
+<!-- RIGHT — the rule emits a clause that stands on its own in every branch -->
+Sleep {{interp.reverse_sleep_dance}} next-day dancing.
+```
 
-## Completion Checklist
+Check every branch your rule can emit and read the sentence aloud in each. A rule that
+reads well when significant and garbles when null is not finished.
 
-- [ ] All result JSON keys mapped to template placeholders
-- [ ] `make check` passes with no errors
-- [ ] `make compile` produces clean manuscript.md
-- [ ] Interpretation text is dynamically generated
-- [ ] Manuscript reads as coherent prose (not just numbers)
+## Phase 4 — Write the template, covering every section
+
+Numbers → `{{prefix.key:formatter}}`. Verdicts → `{{interp.key}}`.
+
+### Coverage is the requirement
+
+A verdict is stated in **more than one place**. A finding typically appears in the
+abstract, in Results, in the Discussion summary, and in a figure caption. If you wire the
+Results sentence to an interpretation rule and hand-write the other three, you have built
+a manuscript that contradicts itself on a re-run — and the contradiction is *harder* to
+spot, because the freshly-derived half looks trustworthy.
+
+**For each RQ, wire every one of these that exists:**
+
+- [ ] Abstract sentence
+- [ ] Results paragraph
+- [ ] Results table cell (verdict columns and significance stars)
+- [ ] Discussion summary point
+- [ ] Figure caption — inline `![...](...)` alt text *and* any Figure Legends section
+- [ ] Supplementary text
+
+Figure captions and the abstract are where this fails most often. They read like framing
+rather than results reporting, so they get hand-written. They are results reporting.
+
+### Section-by-section
+
+**Title.** If the title states a finding ("X Predicts Y, but Y Only Weakly Predicts X"),
+it is a verdict and must be built from an interpretation rule. A title that hardcodes a
+result the data no longer supports is the most expensive version of this bug.
+
+**Abstract.** Every number a placeholder, every verdict an `{{interp.*}}`. No exceptions
+because "it's just a summary".
+
+**Introduction.** Mostly static. Claims about published work are exempt and need no
+placeholder — the guard skips any sentence carrying a citation. End with the questions
+from Phase 1, phrased as questions, not as answers.
+
+**Methods.** Static prose plus placeholders for anything derived: sample sizes, thresholds,
+window boundaries, counts. If a parameter appears in a result JSON (`threshold_cms`), cite
+it as a placeholder — do not retype the value, or Methods will drift from the analysis it
+describes.
+
+**Results.** One subsection per RQ, in registry order. Per finding:
+
+```markdown
+Dancers (Mdn = {{ctrl.dancer_med:f1}} s) {{interp.ctrl_total_sleep}} controls
+(Mdn = {{ctrl.control_med:f1}} s; U = {{ctrl.u:f1}}, p = {{ctrl.p:p}},
+r = {{ctrl.r:r}}).
+```
+
+Section headings state verdicts too. Prefer a neutral heading ("Dancers versus
+network-matched controls") over one that bakes in an answer, unless the heading is itself
+built from a rule.
+
+**Discussion.** Open with `{{interp.*_qualifier}}` rather than asserting the strength
+yourself. Interpretation of *mechanism* — what the effect might mean — is yours to write;
+restating *whether* the effect holds is not.
+
+**Figure legends.** Same rules. Wire them.
+
+## Phase 5 — Verify
+
+```bash
+paper-forge gate
+```
+
+Four deterministic checks, all must pass:
+
+1. **strict compile** — every placeholder resolves
+2. **numeric-literal guard** — no hardcoded numbers
+3. **verdict-claim guard** — no hardcoded verdicts
+4. **research-question check** — every unit serves a declared RQ
+
+For findings that are genuinely static, annotate deliberately — never to silence a real
+verdict:
+
+```markdown
+Colonies were housed at 34 °C. <!-- pf-allow-literal: apparatus constant -->
+Sleep deprivation impairs dances. <!-- pf-allow-claim: prior literature, uncited here -->
+```
+
+Reaching for an allow-comment on a claim about *your own* results means the sentence needs
+an interpretation rule instead. Recurring exceptions belong in `project.yaml`
+(`literals.allow`, `claims.allow`) with a comment saying why.
+
+Then read the compiled output as prose:
+
+```bash
+paper-forge compile && cat manuscript/manuscript.md
+```
+
+## Phase 6 — Flip the verdicts
+
+The guard proves verdicts are *wired*. It cannot prove they read correctly when they
+change. Before declaring the template done, test the branches:
+
+1. Copy `manuscript/results/` aside.
+2. Edit a JSON so a key result crosses significance in the opposite direction.
+3. `paper-forge compile` and read the affected passages — abstract, results, discussion,
+   captions.
+4. Confirm every one flipped, and that each still reads as grammatical English.
+5. Restore the real results.
+
+Passages that did not change are hand-written verdicts the guard's vocabulary missed. Fix
+them, and add the pattern to `claims.extra_patterns` so it is caught next time.
+
+## Completion checklist
+
+- [ ] Every `open` / `answered` RQ is reported somewhere in the manuscript
+- [ ] Every claim traces to exactly one RQ
+- [ ] Every verdict resolves through `{{interp.*}}` — including abstract, captions, title
+- [ ] Every number resolves through `{{prefix.key:formatter}}`
+- [ ] No result unit emits prose
+- [ ] `paper-forge gate` passes
+- [ ] Verdict-flip test done: all branches read as grammatical English
+- [ ] Compiled manuscript reads as prose, not as a form with numbers slotted in
