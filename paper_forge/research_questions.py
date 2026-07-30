@@ -30,12 +30,27 @@ from typing import Any
 METHODS = "methods"  # reserved rq id for descriptive/setup units
 VALID_STATUSES = {"open", "answered", "candidate", "dropped"}
 
+# Where a surviving question lands in the paper. This is the axis `status` does not
+# capture: `status` is how far along a question is, `role` is where its answer goes.
+#   headline    — opens the paper (listed among the questions the introduction poses)
+#   reported    — answered in Results, not necessarily headlined up front
+#   future_work — the data cannot answer it; appears only in Limitations / Future Work,
+#                 never in the introduction. This is the "we asked, we couldn't answer,
+#                 so we don't open with it" outcome the lifecycle exists to make explicit.
+VALID_ROLES = {"headline", "reported", "future_work"}
+
 _HEADING = re.compile(r"^#{2,3}\s+(\S+)\s+[—-]\s+(.+?)\s*$")
 # Accepts "**question:** value" (colon inside the bold) and "**question**: value".
 _FIELD = re.compile(
-    r"^\s*[-*]\s*\*\*\s*(question|status|units)\s*:?\s*\*\*\s*:?\s*(.*)$",
+    r"^\s*[-*]\s*\*\*\s*(question|status|units|evidence|role)\s*:?\s*\*\*\s*:?\s*(.*)$",
     re.IGNORECASE,
 )
+
+# In an `evidence:` list, a key naming a p-value vs an effect size, by suffix. A question
+# can be significant yet negligible — p < alpha with |effect| ~ 0 — so the two are judged
+# separately: significance from the p-keys, magnitude from the effect-keys.
+_P_KEY = re.compile(r"(?:_p|\.p|_pval|_pvalue)$", re.IGNORECASE)
+_EFFECT_KEY = re.compile(r"(?:_r|_rho|_d|_effect|_eta2|_g|\.r)$", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -45,6 +60,12 @@ class ResearchQuestion:
     question: str
     status: str
     units: tuple[str, ...]
+    # Result keys (prefix.key) whose p-values / effect sizes carry this question's
+    # answer. Optional — lets the lifecycle check compare declared prominence against
+    # what the data actually shows.
+    evidence: tuple[str, ...] = ()
+    # Narrative placement; see VALID_ROLES. Empty when not yet assigned.
+    role: str = ""
 
 
 @dataclass(frozen=True)
@@ -64,12 +85,15 @@ def parse_registry(path: str | Path) -> dict[str, ResearchQuestion]:
     def _flush() -> None:
         if cur and cur.get("id"):
             units = tuple(u.strip() for u in cur.get("units", "").split(",") if u.strip())
+            evidence = tuple(e.strip() for e in cur.get("evidence", "").split(",") if e.strip())
             out[cur["id"]] = ResearchQuestion(
                 id=cur["id"],
                 title=cur.get("title", ""),
                 question=cur.get("question", ""),
                 status=cur.get("status", "open").lower(),
                 units=units,
+                evidence=evidence,
+                role=cur.get("role", "").strip().lower(),
             )
 
     for line in path.read_text(encoding="utf-8").splitlines():
@@ -196,6 +220,201 @@ def check_research_questions(
                 )
 
     return findings
+
+
+def _rq_evidence_strength(
+    rq: ResearchQuestion,
+    all_results: dict[str, Any],
+    alpha: float,
+    min_effect: float,
+) -> tuple[str, str] | None:
+    """Summarise a question's evidence as (significance, magnitude), or None if unknown.
+
+    Returns a pair drawn from:
+        significance ∈ {"significant", "nonsignificant"}
+        magnitude    ∈ {"has-effect", "negligible", "unknown"}  ("unknown" = no effect keys)
+
+    None means the question declared no resolvable evidence keys, so strength cannot be
+    judged and no evidence-based finding is emitted.
+    """
+    p_values: list[float] = []
+    effects: list[float] = []
+    for key in rq.evidence:
+        if key not in all_results:
+            continue
+        val = all_results[key]
+        if not isinstance(val, (int, float)) or isinstance(val, bool):
+            continue
+        if _P_KEY.search(key):
+            p_values.append(float(val))
+        elif _EFFECT_KEY.search(key):
+            effects.append(abs(float(val)))
+
+    if not p_values and not effects:
+        return None
+
+    significance = "significant" if p_values and min(p_values) < alpha else "nonsignificant"
+    if effects:
+        magnitude = "has-effect" if max(effects) >= min_effect else "negligible"
+    else:
+        magnitude = "unknown"
+    return significance, magnitude
+
+
+def check_rq_lifecycle(
+    registry: dict[str, ResearchQuestion],
+    all_results: dict[str, Any],
+    template_text: str | None = None,
+    alpha: float = 0.05,
+    min_effect: float = 0.05,
+) -> list[RqFinding]:
+    """Check that each question's declared prominence is honest to its evidence and its
+    placement in the manuscript.
+
+    This is the layer above the structural RU↔RQ check: it catches the paper opening with
+    a question the data cannot answer, and a question buried despite a clear result. It is
+    opt-in per question — a question with neither ``role`` nor ``evidence`` is skipped, so
+    adopting the lifecycle is incremental.
+
+    The evidence checks are *judgement prompts*, not correctness errors: the tool flags a
+    mismatch, the author decides. Only the manuscript-placement contradictions (a retired
+    question opening the paper, a dropped question still in the prose) are hard errors,
+    because there the registry and the manuscript disagree with each other.
+
+    Args:
+        registry: Parsed RQ registry (``parse_registry`` output).
+        all_results: Flat ``prefix.key → value`` mapping (as the compiler builds).
+        template_text: Manuscript template source. When given, placement is checked using
+            ``<!-- rq:<id> -->`` anchors the author drops where each question is discussed.
+        alpha: Significance threshold for the evidence check.
+        min_effect: |effect| below this counts as negligible. The default (0.05) is a
+            "is there anything there at all" floor, deliberately below Cohen's small-effect
+            line (0.1) — the check exists to catch effects that are statistically
+            significant yet practically zero at large n, not to police effect-size tiers.
+
+    Returns:
+        A list of :class:`RqFinding`. Kinds: ``bad-role``, ``evidence-missing``,
+        ``headline-weak``, ``buried-signal``, ``intro-has-retired``, ``headline-absent``,
+        ``dropped-in-manuscript``.
+    """
+    findings: list[RqFinding] = []
+    intro_ids, body_ids = _manuscript_rq_anchors(template_text) if template_text else (set(), set())
+
+    for rq in registry.values():
+        if rq.role and rq.role not in VALID_ROLES:
+            findings.append(
+                RqFinding(
+                    "bad-role",
+                    f"RQ '{rq.id}' has invalid role '{rq.role}' (use: {', '.join(sorted(VALID_ROLES))})",
+                )
+            )
+
+        # An evidence key that resolves to nothing is a typo waiting to mislead.
+        for key in rq.evidence:
+            if key not in all_results:
+                findings.append(
+                    RqFinding(
+                        "evidence-missing",
+                        f"RQ '{rq.id}' cites evidence key '{key}', not found in results",
+                    )
+                )
+
+        strength = _rq_evidence_strength(rq, all_results, alpha, min_effect)
+
+        # Evidence vs prominence. A headline question should carry a clear result; a
+        # negligible or non-significant effect under the spotlight is the exact thing the
+        # revisit step is meant to catch. A deliberate null belongs in Results as a
+        # reported finding, not as the paper's opening promise.
+        if rq.role == "headline" and strength is not None:
+            sig, mag = strength
+            if sig == "nonsignificant":
+                findings.append(
+                    RqFinding(
+                        "headline-weak",
+                        f"RQ '{rq.id}' is role=headline but its evidence is not significant "
+                        f"(min p ≥ {alpha}). Open the paper with a question the data answers, "
+                        "or set role: future_work.",
+                    )
+                )
+            elif mag == "negligible":
+                findings.append(
+                    RqFinding(
+                        "headline-weak",
+                        f"RQ '{rq.id}' is role=headline but its effect is negligible "
+                        f"(max |effect| < {min_effect}) despite significance. Confirm it belongs "
+                        "up front, or report it as a secondary finding (role: reported).",
+                    )
+                )
+
+        # The mirror case: a question demoted to future work that the data actually
+        # answered. Cheap to surface, easy to forget after a reframing.
+        if rq.role == "future_work" and strength == ("significant", "has-effect"):
+            findings.append(
+                RqFinding(
+                    "buried-signal",
+                    f"RQ '{rq.id}' is role=future_work but its evidence is significant with a "
+                    "non-negligible effect — consider reporting it rather than deferring it.",
+                )
+            )
+
+        # Manuscript placement. Only meaningful when a template was supplied.
+        if template_text is not None:
+            anchored = rq.id in intro_ids or rq.id in body_ids
+            if rq.status == "dropped" and anchored:
+                findings.append(
+                    RqFinding(
+                        "dropped-in-manuscript",
+                        f"RQ '{rq.id}' is dropped but is still anchored in the manuscript — remove it.",
+                    )
+                )
+            elif rq.role == "future_work" and rq.id in intro_ids:
+                findings.append(
+                    RqFinding(
+                        "intro-has-retired",
+                        f"RQ '{rq.id}' is role=future_work but appears in the Introduction. A "
+                        "question the data cannot answer should not open the paper.",
+                    )
+                )
+            elif rq.role == "headline" and not anchored:
+                findings.append(
+                    RqFinding(
+                        "headline-absent",
+                        f"RQ '{rq.id}' is role=headline but has no <!-- rq:{rq.id} --> anchor in "
+                        "the manuscript — the promised question is never addressed.",
+                    )
+                )
+
+    return findings
+
+
+_RQ_ANCHOR = re.compile(r"<!--\s*rq:\s*(\S+?)\s*-->")
+_MD_HEADING = re.compile(r"^(#{1,6})\s+(.*)$")
+_INTRO_HEADING = re.compile(r"^#{1,6}\s+(?:\d+\.?\s+)?introduction\b", re.IGNORECASE)
+
+
+def _manuscript_rq_anchors(template_text: str) -> tuple[set[str], set[str]]:
+    """Return (rq ids anchored in the Introduction, rq ids anchored elsewhere).
+
+    Placement is declared with ``<!-- rq:<id> -->`` comments. The Introduction runs from
+    its heading to the next heading of the same or higher level — the same section model
+    the literal and claim guards use.
+    """
+    intro_ids: set[str] = set()
+    body_ids: set[str] = set()
+    intro_level: int | None = None
+
+    for line in template_text.splitlines():
+        stripped = line.strip()
+        heading = _MD_HEADING.match(stripped)
+        if heading:
+            level = len(heading.group(1))
+            if intro_level is not None and level <= intro_level:
+                intro_level = None
+            if _INTRO_HEADING.match(stripped):
+                intro_level = level
+        for m in _RQ_ANCHOR.finditer(line):
+            (intro_ids if intro_level is not None else body_ids).add(m.group(1))
+    return intro_ids, body_ids
 
 
 def format_rq_findings(findings: list[RqFinding]) -> str:

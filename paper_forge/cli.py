@@ -386,12 +386,25 @@ def _cmd_check(args: argparse.Namespace) -> int:
     return exit_code
 
 
+# Lifecycle findings where the registry contradicts the manuscript or itself: hard.
+# The evidence-vs-prominence prompts (headline-weak, buried-signal) and coverage gaps
+# (headline-absent) are advisory — a mismatch the author resolves, not a build breaker.
+_RQ_LIFECYCLE_ERRORS = {
+    "bad-role",
+    "evidence-missing",
+    "intro-has-retired",
+    "dropped-in-manuscript",
+}
+
+
 def _cmd_check_rqs(args: argparse.Namespace) -> int:
-    """Check that every result unit serves a declared research question."""
-    from paper_forge.compiler import load_project_config
+    """Check the RU↔RQ mapping and, when questions opt into it, the RQ lifecycle."""
+    from paper_forge.compiler import load_all_results, load_project_config
     from paper_forge.research_questions import (
         check_research_questions,
+        check_rq_lifecycle,
         format_rq_findings,
+        parse_registry,
     )
 
     try:
@@ -411,13 +424,43 @@ def _cmd_check_rqs(args: argparse.Namespace) -> int:
             )
             return 1
 
-        findings = check_research_questions(registry, results_dir, units)
-        if findings:
-            print(f"\n  {len(findings)} research-question issue(s):", file=sys.stderr)
-            print(format_rq_findings(findings), file=sys.stderr)
-            return 1
-        print("  Every result unit maps to a research question, and every question is backed.")
-        return 0
+        exit_code = 0
+
+        # 1. Structural RU↔RQ mapping (always an error when broken).
+        structural = check_research_questions(registry, results_dir, units)
+        if structural:
+            print(f"\n  {len(structural)} research-question mapping issue(s):", file=sys.stderr)
+            print(format_rq_findings(structural), file=sys.stderr)
+            exit_code = 1
+        else:
+            print("  Every result unit maps to a research question, and every question is backed.")
+
+        # 2. Lifecycle — evidence-linked prominence + manuscript placement. Opt-in: only
+        # runs when at least one question declares a role or evidence keys.
+        parsed = parse_registry(registry)
+        if any(rq.role or rq.evidence for rq in parsed.values()):
+            all_results = load_all_results(results_dir, prefix_map)
+            template_path = base_dir / config["manuscript"]
+            template_text = (
+                template_path.read_text(encoding="utf-8") if template_path.exists() else None
+            )
+            life = check_rq_lifecycle(parsed, all_results, template_text=template_text)
+            errors = [f for f in life if f.kind in _RQ_LIFECYCLE_ERRORS]
+            warnings = [f for f in life if f.kind not in _RQ_LIFECYCLE_ERRORS]
+            if errors:
+                print(f"\n  ERROR: {len(errors)} RQ lifecycle contradiction(s):", file=sys.stderr)
+                print(format_rq_findings(errors), file=sys.stderr)
+                exit_code = 1
+            if warnings:
+                print(
+                    f"\n  WARNING: {len(warnings)} RQ prominence issue(s) to confirm:",
+                    file=sys.stderr,
+                )
+                print(format_rq_findings(warnings), file=sys.stderr)
+            if not life:
+                print("  RQ lifecycle: prominence matches evidence and manuscript placement.")
+
+        return exit_code
     except FileNotFoundError as e:
         print(f"ERROR: {e}", file=sys.stderr)
         return 1
