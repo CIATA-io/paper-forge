@@ -221,8 +221,6 @@ class TestCompileManuscript:
     def test_derived_keys(self, project_dir: Path):
         import yaml
 
-        # Update config with derived key (literal expression since dot-keys
-        # can't be Python identifiers)
         config_path = project_dir / "project.yaml"
         config = yaml.safe_load(config_path.read_text())
         config["derived"] = {"computed.ratio": "42.0 / 2"}
@@ -236,6 +234,31 @@ class TestCompileManuscript:
 
         result = compile_manuscript(config_path)
         assert "21.0" in result
+
+    def test_derived_key_can_reference_dotted_result_keys(self, project_dir: Path):
+        # Result keys are dotted (prefix.key) and not valid identifiers, so a derived
+        # expression must reach them via results['prefix.key']. This is the common case
+        # for any real project — a ratio or percentage of two computed values.
+        import json
+
+        import yaml
+
+        results_dir = project_dir / "results"
+        results_dir.mkdir(exist_ok=True)
+        (results_dir / "00_stats.json").write_text(
+            json.dumps({"results": {"a": 8.0, "b": 2.0}}), encoding="utf-8"
+        )
+        config_path = project_dir / "project.yaml"
+        config = yaml.safe_load(config_path.read_text())
+        config.setdefault("prefix_map", {})["00_stats"] = "s"
+        config["results_dir"] = "results/"
+        config["derived"] = {"s.ratio": "results['s.a'] / results['s.b']"}
+
+        manuscript = project_dir / "manuscript.md"
+        manuscript.write_text(manuscript.read_text() + "\nRatio: {{s.ratio:f1}}\n")
+        config_path.write_text(yaml.dump(config))
+
+        assert "4.0" in compile_manuscript(config_path)
 
 
 class TestRenderModeAutoDetect:

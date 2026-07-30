@@ -25,7 +25,9 @@ its placeholder prefix::
     interpretations: interpretations.yaml   # optional rules engine (see interpretation.py)
     interpretation_functions: scripts/interp_functions.py  # optional; module with register(engine)
     derived:
-      my_derived_key: "python_expression"
+      # Reference other results via results['prefix.key'] (dotted keys are not
+      # valid identifiers); bare names work for identifier-safe and prior derived keys.
+      pcorr.forage_dance_ratio: "abs(results['pcorr.partial_forage_rho'] / results['pcorr.partial_dance_rho'])"
 """
 
 from __future__ import annotations
@@ -259,8 +261,15 @@ def _resolve_derived(
     }
     for key, expr in derived.items():
         try:
-            # Provide results as local variables for the expression
-            value = eval(expr, {"__builtins__": _SAFE_BUILTINS}, all_results)  # noqa: S307
+            # Result keys are dotted (prefix.key), which are not valid Python identifiers,
+            # so a bare-name reference in the expression cannot reach them. Expose the flat
+            # results under `results`/`r` so expressions index them:
+            #     "results['pcorr.partial_forage_rho'] / results['pcorr.partial_dance_rho']"
+            # Identifier-safe keys (and prior derived keys) remain available as bare names.
+            namespace = dict(all_results)
+            namespace["results"] = all_results
+            namespace["r"] = all_results
+            value = eval(expr, {"__builtins__": _SAFE_BUILTINS}, namespace)  # noqa: S307
             all_results[key] = value
         except Exception as e:
             print(f"  WARNING: Failed to evaluate derived key '{key}': {e}", file=sys.stderr)
