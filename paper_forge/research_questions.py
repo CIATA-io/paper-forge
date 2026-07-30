@@ -419,3 +419,174 @@ def _manuscript_rq_anchors(template_text: str) -> tuple[set[str], set[str]]:
 
 def format_rq_findings(findings: list[RqFinding]) -> str:
     return "\n".join(f"    [{f.kind}] {f.message}" for f in findings)
+
+
+# --------------------------------------------------------------------------- #
+# Iteration-to-iteration evidence diff — the deterministic core of the halt    #
+# decision for the human-in-the-loop iteration report.                         #
+# --------------------------------------------------------------------------- #
+#
+# The report must decide, each loop iteration, whether a change is
+# conclusion-changing (halt the loop) or not. Adversarial review of the report
+# design showed this MUST be computed, not eyeballed from a git diff: a headline
+# effect flipping 0.61 → -0.08 is trivially missed by an agent reading unified
+# diff text. So the halt-relevant numeric deltas are computed here, from the two
+# result snapshots the loop already has (current working tree vs the last commit),
+# keyed by each question's declared evidence and role.
+#
+# This does NOT replace the compiled-prose check (a verdict can flip because the
+# interpretation RULE changed while its input numbers held). It covers the
+# numeric half; the skill pairs it with a scan of the compiled manuscript diff.
+
+_SIG = 1e-12  # |x| below this counts as zero, absorbing float noise on unchanged reruns
+
+
+@dataclass(frozen=True)
+class EvidenceDelta:
+    """One evidence key's movement between two snapshots, pre-classified for the loop."""
+
+    rq_id: str
+    role: str
+    key: str
+    kind: str  # "p" | "effect" | "other"
+    old: float | None  # None → the key is new this iteration (no baseline)
+    new: float | None  # None → the key disappeared
+    rel_delta: float | None  # |new-old|/|old|; None when undefined (old is 0 or absent)
+    sign_flip: bool
+    crosses_alpha: bool  # p-keys only: significance boundary crossed
+    classification: str  # "halt" | "decision" | "notification"
+    reason: str
+
+
+def _key_kind(key: str) -> str:
+    if _P_KEY.search(key):
+        return "p"
+    if _EFFECT_KEY.search(key):
+        return "effect"
+    return "other"
+
+
+def _num(v: Any) -> float | None:
+    if isinstance(v, bool) or not isinstance(v, (int, float)):
+        return None
+    return float(v)
+
+
+def _classify_delta(
+    role: str,
+    kind: str,
+    old: float | None,
+    new: float | None,
+    alpha: float,
+    min_effect: float,
+    mag_threshold: float,
+) -> tuple[float | None, bool, bool, str, str]:
+    """Return (rel_delta, sign_flip, crosses_alpha, classification, reason).
+
+    Only ``headline`` questions can reach ``halt`` — those are the paper's stated
+    conclusions. ``reported`` downgrades a would-be halt to ``decision``;
+    ``future_work`` (and anything else) never rises above ``notification``.
+    """
+
+    def tier(halt_reason: str) -> tuple[str, str]:
+        if role == "headline":
+            return "halt", halt_reason
+        if role == "reported":
+            return "decision", f"{halt_reason} (reported, not headline → decision)"
+        return "notification", f"{halt_reason} (role={role or 'unset'} → informational)"
+
+    # Appearance / disappearance of a headline input has no baseline to compare.
+    if old is None and new is not None:
+        cls = "decision" if role in ("headline", "reported") else "notification"
+        return None, False, False, cls, "new evidence key — no prior-iteration baseline"
+    if new is None:
+        cls = "decision" if role in ("headline", "reported") else "notification"
+        return None, False, False, cls, "evidence key disappeared this iteration"
+
+    old_zero = abs(old) < _SIG
+    new_zero = abs(new) < _SIG
+    sign_flip = (not old_zero and not new_zero) and (old > 0) != (new > 0)
+    rel_delta = None if old_zero else abs(new - old) / abs(old)
+
+    if kind == "p":
+        # p-values wiggling within a significance verdict do not change a conclusion;
+        # only crossing alpha does. This is what stops p=.049→.011 from false-halting.
+        crosses = (old < alpha) != (new < alpha)
+        if crosses:
+            cls, reason = tier(f"p-value crossed alpha ({old:.4g}→{new:.4g})")
+            return rel_delta, sign_flip, True, cls, reason
+        return rel_delta, sign_flip, False, "notification", "p-value moved but stayed the same side of alpha"
+
+    if kind == "effect":
+        if old_zero and not new_zero:
+            cls, reason = tier(f"effect emerged from zero (0→{new:.4g})")
+            return rel_delta, sign_flip, False, cls, reason
+        if sign_flip:
+            cls, reason = tier(f"effect direction reversed ({old:.4g}→{new:.4g})")
+            return rel_delta, sign_flip, False, cls, reason
+        if rel_delta is not None and rel_delta >= mag_threshold:
+            cls, reason = tier(f"effect magnitude shifted {rel_delta * 100:.0f}% ({old:.4g}→{new:.4g})")
+            return rel_delta, sign_flip, False, cls, reason
+        return rel_delta, sign_flip, False, "notification", "effect change within tolerance"
+
+    # "other" keys (counts, medians, …): not verdict inputs. A large move on a headline
+    # one is worth a look but is never on its own a halt.
+    if role == "headline" and rel_delta is not None and rel_delta >= mag_threshold:
+        return rel_delta, sign_flip, False, "decision", f"headline quantity moved {rel_delta * 100:.0f}%"
+    return rel_delta, sign_flip, False, "notification", "non-verdict quantity change"
+
+
+def evidence_delta(
+    registry: dict[str, ResearchQuestion],
+    old_results: dict[str, Any],
+    new_results: dict[str, Any],
+    alpha: float = 0.05,
+    min_effect: float = 0.05,
+    mag_threshold: float = 0.25,
+) -> list[EvidenceDelta]:
+    """Diff each question's evidence keys between two snapshots, classified for the loop.
+
+    Args:
+        registry: parsed RQ registry (``parse_registry`` output).
+        old_results: flat ``prefix.key → value`` from the baseline (last commit).
+        new_results: flat ``prefix.key → value`` from the current working tree.
+        alpha: significance threshold for p-keys.
+        min_effect: reserved for parity with the lifecycle check (unused here; the
+            magnitude test is relative, not absolute).
+        mag_threshold: relative change on an effect/quantity that counts as material
+            (default 0.25 — a quarter shift moves a reader's inference; also above
+            float-noise so an unchanged rerun does not false-halt).
+
+    Returns:
+        One :class:`EvidenceDelta` per changed evidence key, in registry order. Keys whose
+        value is identical (within float noise) across snapshots are omitted.
+    """
+    out: list[EvidenceDelta] = []
+    for rq in registry.values():
+        for key in rq.evidence:
+            old = _num(old_results.get(key))
+            new = _num(new_results.get(key))
+            if old is not None and new is not None and abs(new - old) < _SIG:
+                continue  # unchanged
+            if old is None and new is None:
+                continue  # key absent from both snapshots — not this diff's business
+            kind = _key_kind(key)
+            rel, flip, crosses, cls, reason = _classify_delta(
+                rq.role, kind, old, new, alpha, min_effect, mag_threshold
+            )
+            out.append(
+                EvidenceDelta(
+                    rq_id=rq.id,
+                    role=rq.role,
+                    key=key,
+                    kind=kind,
+                    old=old,
+                    new=new,
+                    rel_delta=rel,
+                    sign_flip=flip,
+                    crosses_alpha=crosses,
+                    classification=cls,
+                    reason=reason,
+                )
+            )
+    return out

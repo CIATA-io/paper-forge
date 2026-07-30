@@ -344,3 +344,91 @@ def test_dropped_rq_anchored_in_manuscript_is_flagged(tmp_path):
     )
     findings = check_rq_lifecycle(reg, {}, template_text=MANUSCRIPT)
     assert [f.kind for f in findings] == ["dropped-in-manuscript"]
+
+
+# --- evidence_delta: the deterministic halt computation ----------------------
+
+from paper_forge.research_questions import evidence_delta  # noqa: E402
+
+
+def _one(body, old, new, **kw):
+    """Parse a one-RQ registry and return the single delta for its evidence keys."""
+    import tempfile, pathlib
+    d = pathlib.Path(tempfile.mkdtemp())
+    (d / "rq.md").write_text(body, encoding="utf-8")
+    reg = _parse(d / "rq.md")
+    return evidence_delta(reg, old, new, **kw)
+
+
+HEADLINE = (
+    "## RQ1 — T\n- **question:** q?\n- **status:** open\n- **units:** u\n"
+    "- **evidence:** a.eff_r, a.main_p\n- **role:** headline\n"
+)
+
+
+def test_effect_sign_flip_on_headline_halts():
+    d = _one(HEADLINE, {"a.eff_r": 0.61, "a.main_p": 1e-8}, {"a.eff_r": -0.08, "a.main_p": 1e-8})
+    eff = [x for x in d if x.key == "a.eff_r"][0]
+    assert eff.sign_flip and eff.classification == "halt"
+
+
+def test_effect_magnitude_shift_at_exactly_quarter_halts():
+    # 344 -> 258 is exactly 0.25; the boundary must be inclusive (>=), not strict.
+    d = _one(HEADLINE, {"a.eff_r": 344.0, "a.main_p": 1e-8}, {"a.eff_r": 258.0, "a.main_p": 1e-8})
+    eff = [x for x in d if x.key == "a.eff_r"][0]
+    assert round(eff.rel_delta, 4) == 0.25 and eff.classification == "halt"
+
+
+def test_effect_shift_below_quarter_is_notification():
+    d = _one(HEADLINE, {"a.eff_r": 0.40, "a.main_p": 1e-8}, {"a.eff_r": 0.35, "a.main_p": 1e-8})
+    eff = [x for x in d if x.key == "a.eff_r"][0]
+    assert eff.classification == "notification"
+
+
+def test_pvalue_move_within_significance_does_not_halt():
+    # p .049 -> .011: big relative change, same side of alpha, conclusion unchanged.
+    d = _one(HEADLINE, {"a.eff_r": 0.4, "a.main_p": 0.049}, {"a.eff_r": 0.4, "a.main_p": 0.011})
+    p = [x for x in d if x.key == "a.main_p"][0]
+    assert not p.crosses_alpha and p.classification == "notification"
+
+
+def test_pvalue_crossing_alpha_on_headline_halts():
+    d = _one(HEADLINE, {"a.eff_r": 0.4, "a.main_p": 0.04}, {"a.eff_r": 0.4, "a.main_p": 0.20})
+    p = [x for x in d if x.key == "a.main_p"][0]
+    assert p.crosses_alpha and p.classification == "halt"
+
+
+def test_effect_emerging_from_zero_halts():
+    d = _one(HEADLINE, {"a.eff_r": 0.0, "a.main_p": 0.2}, {"a.eff_r": 0.3, "a.main_p": 0.2})
+    eff = [x for x in d if x.key == "a.eff_r"][0]
+    assert eff.classification == "halt" and "zero" in eff.reason
+
+
+def test_new_headline_key_without_baseline_is_decision():
+    d = _one(HEADLINE, {"a.main_p": 0.2}, {"a.eff_r": 0.5, "a.main_p": 0.2})
+    eff = [x for x in d if x.key == "a.eff_r"][0]
+    assert eff.old is None and eff.classification == "decision"
+
+
+def test_reported_role_downgrades_halt_to_decision():
+    body = HEADLINE.replace("role:** headline", "role:** reported")
+    d = _one(body, {"a.eff_r": 0.6, "a.main_p": 1e-8}, {"a.eff_r": -0.1, "a.main_p": 1e-8})
+    eff = [x for x in d if x.key == "a.eff_r"][0]
+    assert eff.sign_flip and eff.classification == "decision"
+
+
+def test_future_work_role_never_halts():
+    body = HEADLINE.replace("role:** headline", "role:** future_work")
+    d = _one(body, {"a.eff_r": 0.6, "a.main_p": 0.04}, {"a.eff_r": -0.1, "a.main_p": 0.9})
+    assert all(x.classification == "notification" for x in d)
+
+
+def test_unchanged_keys_are_omitted():
+    d = _one(HEADLINE, {"a.eff_r": 0.4, "a.main_p": 0.01}, {"a.eff_r": 0.4, "a.main_p": 0.01})
+    assert d == []
+
+
+def test_float_noise_is_not_a_change():
+    d = _one(HEADLINE, {"a.eff_r": 0.400000000000, "a.main_p": 0.01},
+             {"a.eff_r": 0.4000000000001, "a.main_p": 0.01})
+    assert d == []
