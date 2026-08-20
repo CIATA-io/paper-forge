@@ -12,7 +12,7 @@ service. This is milestone M0 of the review loop; M2+ add the editor and the kee
 
 ## Steps
 
-1. **Gate first.** Run `paper-forge gate` (strict compile + numeric-literal guard + check-rqs).
+1. **Gate first.** Run `paper-forge gate` (strict compile + numeric-literal guard + verdict guard + citation guard + check-rqs).
    If the manuscript doesn't compile cleanly or has hardcoded literals, stop and report that —
    there's nothing stable to review.
 

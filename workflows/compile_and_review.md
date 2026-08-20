@@ -54,6 +54,9 @@
    | `Unknown prefix: xyz` | Not in prefix map | Update `project.yaml` |
    | `Unfilled placeholder` | JSON missing value | Run result unit |
    | `Unknown formatter: foo` | Typo in template | Fix formatter name |
+   | `hallucinated-token` | Token in template matches no bibliography entry | Copy a valid token from `paper-forge tokens` |
+   | `undefined-key` | Cite key in template not found in .bib | Add the entry to .bib, or correct the key |
+   | `unkeyed-attribution` | Prose "(Author Year)" with no accompanying citation | Replace with `[@key]` or `[ref:…]` |
 
 9. Verify no raw `{{...}}` placeholders remain in the compiled output:
    ```bash

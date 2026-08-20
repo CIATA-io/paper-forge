@@ -61,6 +61,17 @@ mechanism (or a `.bib` + CrossRef/DOI check) would verify citations resolve to r
 This would have caught the fabricated reference [6] (real title, invented authors/venue/year)
 in the reservoir manuscript automatically.
 
+> **Status (2026-08):** Partially shipped. `paper-forge check` (via `--strict-refs`),
+> `check-refs`, and `gate` now run a citation guard that cross-checks every cite key and
+> `[ref:…]` token against the project bibliography and reports undefined keys,
+> hallucinated tokens, malformed tokens, unkeyed prose attributions, duplicate entries,
+> and coverage. Reference tokens (`paper-forge tokens`) make an invented citation
+> structurally detectable without DOI verification: a token is a 12-hex-char digest
+> derived from the bibliography entry, so the guard can call a token that resolves to
+> nothing a **certain** fabrication rather than a heuristic. **Not yet shipped:** DOI /
+> Crossref verification of whether an entry describes a real paper (i.e., catching a
+> bibliographically complete but fictitious entry such as [6]).
+
 **P2 — Harden `derived` eval.** `_resolve_derived` uses `eval` with a builtin allowlist
 (compiler.py:257). Move to `simpleeval` or an AST-restricted evaluator.
 

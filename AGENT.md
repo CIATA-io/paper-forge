@@ -15,7 +15,7 @@ placeholder-based templating.
 paper-forge/
 ├── paper_forge/                  # Core Python package
 │   ├── __init__.py
-│   ├── cli.py                    # argparse CLI (init/compile/check/check-refs/check-rqs/pdf)
+│   ├── cli.py                    # argparse CLI (init/compile/check/check-refs/tokens/check-rqs/gate/pdf)
 │   ├── compiler.py               # project.yaml loader + placeholder compilation
 │   ├── formatters.py             # Number formatters (p, r, int, fmt2, pct, pct0, …)
 │   ├── literals.py               # Numeric-literal guard (hardcoded-number detector)
@@ -133,6 +133,8 @@ uv run ruff format --check .
 - Test config parsing with valid and invalid YAML
 - Test checker finds missing and orphaned placeholders
 - Test provenance captures git metadata
+- `test_citations.py` — BibTeX parser, cite-key resolution, duplicate detection, token round-trips, coverage reporting
+- `test_sentences.py` — abbreviation-aware segmentation edge cases shared by the verdict-claim and citation guards
 
 ### Template Tests (`template/tests/`)
 - These are example tests shipped to users

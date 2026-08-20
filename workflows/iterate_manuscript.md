@@ -18,6 +18,7 @@
    | **Analysis** | "Add a subgroup analysis" | New result unit |
    | **Structure** | "Move methods before results" | Reorganize template |
    | **Data** | "Exclude outliers" | Modify result unit |
+   | **Citations** | "Add references for claims" | Use cite keys (`[@key]`) or reference tokens from `paper-forge tokens` |
 
 3. Create a checklist of changes:
    ```markdown
@@ -82,6 +83,11 @@
     (95% CI [{{pri.ci_lower:fmt2}}, {{pri.ci_upper:fmt2}}])
     ```
 
+    When editing prose, cite sources with a key (`[@key]`, `\citep{key}`) or a
+    reference token from `paper-forge tokens`. Prose attributions such as
+    "(Smith et al. 2020)" in a sentence that cites nothing are flagged as
+    `unkeyed-attribution` by `make check`.
+
 ### For New Result Units
 
 12. Follow the `/write_unit` workflow to create the new unit.
@@ -104,6 +110,11 @@
     ```bash
     make check
     ```
+
+    The citation guard also runs here. A `hallucinated-token` finding means a token
+    in the template resolves to nothing — obtain a valid token from `paper-forge tokens`.
+    An `undefined-key` finding means a cite key is absent from the .bib file. Neither
+    finding should be suppressed.
 
 ## Phase 5: Diff Against Previous Version
 

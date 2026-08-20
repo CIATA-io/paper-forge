@@ -38,8 +38,8 @@ scope creep. `manuscript/review/charter.md` adds the data/feature/model bounds w
    - **strengthen** → summarise the proposed analysis + cost, get the user's OK, then spawn.
    - **expand** → do not run; record a rebuttal-backlog entry (what it would take, whether it's
      worth it) for the response-to-reviewers, and tell the user.
-4. **Gate.** Every candidate change from the analyst must pass `paper-forge check
-   --strict-literals` + `compile` (+ `consistency` + `pytest` when present). Reject red candidates.
+4. **Gate.** Every candidate change from the analyst must pass `paper-forge gate`
+   (+ `consistency` + `pytest` when present). Reject red candidates.
 5. **Net-benefit check.** Keep a change only if the manuscript is stronger and no new weakness
    opened (a test that came back n.s., or a check that muddied a claim, goes to the human, not
    into the paper). Present before/after numbers and the diff for approval; do not auto-commit.

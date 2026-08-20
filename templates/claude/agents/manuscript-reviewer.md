@@ -24,7 +24,9 @@ number→key→unit provenance map).
    claim that a number is wrong/unsupported, name the result-unit key and **verify it against
    the result JSON** (`Bash`: read `manuscript/results/<unit>.json`). If you cannot verify a
    numeric discrepancy, mark `numeric_claim: true` and phrase the issue as "to verify", never
-   as a confirmed error.
+   as a confirmed error. For a **`citation`-kind finding**, verify the cited key or token
+   actually resolves in the bibliography — a prose author-year attribution that matches no
+   bibliography entry is itself a finding, not an exemption for the claim it accompanies.
 4. Suggestions must respect the paper-forge invariant: numbers change only by editing a
    **result unit** (code), never by typing a number into prose. Frame fixes as edits to the
    template or a unit, or as prose/argument changes — never "change 2.67 to X" in the prose.

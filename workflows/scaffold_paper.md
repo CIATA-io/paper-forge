@@ -48,6 +48,7 @@
    - Project name and title
    - Author information
    - Plan the result unit prefix map based on the analyses identified in Phase 1
+   - If the project has a bibliography, add a `citations:` block (path, enforcement, coverage threshold)
 
    Example:
    ```yaml
@@ -56,6 +57,10 @@
        "01_demographics": "demo"
        "02_primary_outcome": "pri"
        "03_secondary_outcome": "sec"
+   citations:
+     bibliography: "references.bib"
+     enforce: false
+     flag_prose_attributions: true
    ```
 
 ## Phase 4: Create Result Unit Stubs
@@ -116,5 +121,6 @@
 - [ ] `project.yaml` configured with correct prefix map
 - [ ] Result unit stubs created for all planned analyses
 - [ ] Template has section structure with placeholder comments
+- [ ] Bibliography configured in `project.yaml` and `paper-forge tokens` run to produce the token table (if using a .bib)
 - [ ] `make check` passes (or only reports expected TODOs)
 - [ ] Git repository initialized

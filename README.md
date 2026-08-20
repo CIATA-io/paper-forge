@@ -292,14 +292,22 @@ point `project.yaml` at an `interpretations:` file to enable it. Most projects d
 ## Reproducibility Guardrails
 
 paper-forge doesn't just *let* you source every number from code — it **checks** that you did.
+Four guards run under `paper-forge check`: the **literal** guard (hardcoded numbers), the
+**verdict** guard (statistical conclusions asserted as prose), the **citation** guard
+(cite keys that resolve to nothing, fabricated reference tokens, prose attributions),
+and the **placeholder** check (missing or unresolved `{{…}}` slots). The
+[Citations](#citations) section covers the citation guard in detail.
 
-`paper-forge check` scans the **template** for hardcoded numbers that should have come from
-a result unit:
+`paper-forge check` runs all four guards; each can be suppressed or promoted to an error individually:
 
 ```bash
-paper-forge check                    # placeholders + literal guard (literals are warnings)
+paper-forge check                    # all guards (findings are warnings)
 paper-forge check --strict-literals  # hardcoded literals become errors (non-zero exit)
-paper-forge check --no-literals      # skip the literal guard entirely
+paper-forge check --no-literals      # skip the numeric-literal guard entirely
+paper-forge check --strict-refs      # unresolvable cite keys become errors
+paper-forge check --no-refs          # skip the citation guard entirely
+paper-forge check --strict-claims    # prose verdicts become errors
+paper-forge check --no-claims        # skip the verdict-claim guard entirely
 ```
 
 Digits inside placeholders, fenced code, citations (`[12]`), and section numbers are ignored.
@@ -513,9 +521,11 @@ literals:
 # rendering.bibliography, the manuscript front-matter, then any *.bib beside this file.
 citations:
   bibliography: "references.bib"
-  enforce: false          # true = unresolvable cite keys fail `check` (like --strict-refs)
-  min_coverage: 0         # >0 also fails when too few bibliography entries are cited
-  allow: []               # regexes for '@'-shaped text that is not a citation
+  enforce: false                # true = unresolvable cite keys fail `check` (like --strict-refs)
+  min_coverage: 0               # >0 also fails when too few bibliography entries are cited
+  flag_prose_attributions: true # report "(Author Year)" typed as prose instead of a citation
+  expand_tokens: auto           # [ref:…] → \cite{key} / [@key]; auto|pandoc|latex|off
+  allow: []                     # regexes for '@'-shaped text that is not a citation
 
 execution:
   python: "uv run python"
@@ -573,8 +583,8 @@ within the research-question registry and the analysis charter (`manuscript/revi
 | **focus** | a claim/RQ is weak or under-supported | propose narrowing/dropping the RQ |
 | **expand** | needs *new data* / features / models | propose a rebuttal note only — nothing runs |
 
-Every candidate change must pass the gate — `paper-forge gate` (strict `compile` +
-`check --strict-literals` + `check-rqs`) — and the analyst edits result units only, so a
+Every candidate change must pass the gate — `paper-forge gate` (strict compile + all
+guards + check-rqs) — and the analyst edits result units only, so a
 number changes only through
 reproducible code. See [`docs/review_loop_build_plan.md`](docs/review_loop_build_plan.md)
 for the full design and milestones.
@@ -669,6 +679,16 @@ Each unit declares the question it answers (`rq=` in `save_results`), and
 `paper-forge check-rqs` enforces the mapping. The set of research questions is
 the natural bound on how far an analysis can grow (see [Research
 Questions](#research-questions)).
+
+### Citations Are Verified, Not Trusted
+
+`paper-forge check` resolves every cite key and reference token against the project
+bibliography. An unresolved key or a well-formed `[ref:…]` token that matches no
+entry is flagged. For reference tokens, fabrication is structurally impossible — a
+token is derived from the entry itself and cannot be guessed, so an unresolved token
+is certain evidence of invention. Cite-key resolution catches only keys that resolve
+to nothing; an invented key that collides with a real entry resolves successfully and
+cannot be caught structurally — which is why the token scheme exists.
 
 ---
 

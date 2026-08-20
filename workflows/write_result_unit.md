@@ -128,6 +128,7 @@
     - Use `:p` for p-values (auto-formats to APA style)
     - Use `:pct` for percentages
     - No formatter needed for text/interpretation values
+    - Cite sources in prose with `[@key]` or a reference token from `paper-forge tokens`, not as "(Author Year)"
 
 ## Phase 6: Validate
 
@@ -135,6 +136,9 @@
     ```bash
     make check
     ```
+
+    Citation guard findings (`hallucinated-token`, `undefined-key`) appear here if
+    the template prose references sources not in the bibliography.
 
 13. Fix any reported issues (missing keys, orphaned placeholders).
 

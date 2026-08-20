@@ -7,7 +7,7 @@ Provides the ``paper-forge`` CLI with subcommands:
     - ``check-refs`` — cross-check citations against the bibliography, report coverage
     - ``tokens``     — print the reference token for each bibliography entry
     - ``check-rqs``  — verify every result unit serves a declared research question
-    - ``gate``       — run the full consistency gate (compile + check + check-rqs)
+    - ``gate``       — strict compile + literal, verdict and citation guards + check-rqs
     - ``pdf``        — render compiled markdown to PDF
 """
 
@@ -225,7 +225,7 @@ if __name__ == "__main__":
     if not makefile_path.exists():
         makefile_path.write_text(
             """\
-.PHONY: all units compile check pdf pipeline clean help
+.PHONY: all units compile check check-refs tokens pdf pipeline clean help
 
 PYTHON ?= uv run python
 
@@ -242,8 +242,16 @@ compile:
 \t@uv run paper-forge compile
 
 check:
-\t@echo "Checking placeholders..."
+\t@echo "Checking placeholders, literals, verdicts and citations..."
 \t@uv run paper-forge check
+
+check-refs:
+\t@echo "Cross-checking citations against the bibliography..."
+\t@uv run paper-forge check-refs
+
+tokens:
+\t@echo "Reference tokens for this project's bibliography:"
+\t@uv run paper-forge tokens
 
 pdf:
 \t@echo "Rendering PDF..."
@@ -257,7 +265,7 @@ clean:
 \trm -f manuscript/results/*.json
 
 help:
-\t@echo "Targets: all units compile check pdf pipeline clean"
+\t@echo "Targets: all units compile check check-refs tokens pdf pipeline clean"
 """,
             encoding="utf-8",
         )
@@ -682,7 +690,7 @@ def _cmd_check_rqs(args: argparse.Namespace) -> int:
 
 
 def _cmd_gate(args: argparse.Namespace) -> int:
-    """Run the full consistency gate: strict compile + literal guard + RQ check.
+    """Run the full consistency gate: strict compile + every guard + the RQ check.
 
     Chains the checks that must all pass before a manuscript is trustworthy, and
     returns non-zero if any fails. This is the deterministic gate the Claude-native
@@ -940,7 +948,8 @@ def build_parser() -> argparse.ArgumentParser:
     # gate
     gate_parser = subparsers.add_parser(
         "gate",
-        help="Run the consistency gate (strict compile + literal guard + check-rqs)",
+        help="Run the consistency gate (strict compile + literal, verdict and citation "
+        "guards + check-rqs)",
     )
     gate_parser.add_argument(
         "--config",

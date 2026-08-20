@@ -47,7 +47,7 @@ anchored or not.
 
 ## What is a decision (needs the human, does not halt)
 
-- `gate` FAIL on **strict-compile** or **literal-guard** — must fix, but no conclusion moved.
+- `gate` FAIL on **strict-compile**, **literal-guard**, or **citation-guard** — must fix, but no conclusion moved.
 - `check-rqs` **headline-weak** (a headlined RQ on weak/negligible evidence — the framing call),
   **buried-signal**, or **headline-absent** (which also blinds H4 for that RQ — see Notes).
 - `rq_delta.py` **DECISION** rows (reported-RQ movements; new headline evidence keys with no
@@ -90,8 +90,13 @@ attributable to any RQ anchor.
    counts, not only token add/remove. Then:
    - anchor's RQ role is **headline or reported** → **HALT (H4)**.
    - the changed line sits in the **Abstract** section → **HALT (H4)**, anchored or not.
-   - the changed line carries a **citation** (author-year, `[12]`, or opens with "Unlike/Contrary
-     to/In contrast to") → it is prior-work, not our claim → notification.
+   - the changed line carries a **resolvable citation** — a `\cite{key}`, `[@key]`, or
+     `[ref:token]` whose key/token resolves in the bibliography; or, in a project with no
+     `.bib`, a numbered `[12]`; or opens
+     with "Unlike/Contrary to/In contrast to" — it is prior-work, not our claim → notification.
+     (In a `.bib` project, a prose author-year attribution like "(Klein et al. 2010)" that
+     matches no bibliography entry is **not** a resolvable citation; do not grant this exemption
+     on shape alone — flag the verdict change normally.)
    - role is **future_work**, or the change is unattributable to any anchor → notification.
 
 4. **Build the decision queue.** Assign stable labels as you classify: halts `DQ-H1, DQ-H2 …`,
@@ -117,7 +122,9 @@ DQ-D1 [RQ1] headlined on a negligible effect (p=.031, |r|=.03) — headline or d
 ### Gate                                  ← one row per check; two vocab columns
   check            PASS/FAIL   check-rqs signal
   strict-compile   PASS        —
+  literal-guard    PASS        —
   claim-guard      PASS        —
+  citation-guard   PASS        —
   check-rqs        PASS        ADVISORY headline-weak(RQ1), headline-absent(RQ3,RQ5)
 
 ### RQ delta                              ← only RQs that moved; verbatim from [rq_delta]

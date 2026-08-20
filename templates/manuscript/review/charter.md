@@ -47,8 +47,7 @@ reproducible from the readable, in-repo data run without a data-access change.
 
 - ≤ 3 new/changed result units.
 - Every changed number must flow through a result unit and pass the gate —
-  `paper-forge check --strict-literals` → `compile` → `check-rqs` (plus `pytest` when the project
-  has tests). No hand-entered numbers.
+  `paper-forge gate` (plus `pytest` when the project has tests). No hand-entered numbers.
 - **Net-benefit rule:** keep a change only if re-review shows the manuscript got stronger and no
   new weakness opened. A test that comes back non-significant, or a check that muddies a claim, is
   surfaced for a human decision — never auto-included.

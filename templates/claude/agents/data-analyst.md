@@ -46,7 +46,7 @@ so your edits are how a *number* legitimately changes.
    a documented known-value with the divergent recompute preserved and the gap flagged (do not
    silently overwrite).
 3. Re-run the unit(s) and **pass the gate**: `paper-forge gate` must succeed (strict compile +
-   numeric-literal guard + check-rqs). Run `pytest -q` if the project has unit tests.
+   numeric-literal guard + verdict-claim guard + citation guard + check-rqs). Run `pytest -q` if the project has unit tests.
 4. Report the before/after numbers and confirm the manuscript still compiles.
 
 ## Output (return as your final message)

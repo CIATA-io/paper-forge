@@ -1,20 +1,22 @@
 # paper-forge project Makefile
 # ============================================================
 # Usage:
-#   make compile   — compile manuscript (fill placeholders)
-#   make check     — validate all placeholders are satisfied
-#   make pdf       — render compiled manuscript to PDF
-#   make all       — compile + pdf
-#   make units     — run all result units
-#   make test      — run tests
-#   make lint      — run ruff linter
-#   make clean     — remove generated files
+#   make compile    — compile manuscript (fill placeholders)
+#   make check      — run placeholder, literal, verdict, and citation guards
+#   make check-refs — cross-check citations against bibliography
+#   make tokens     — print the reference-token table
+#   make pdf        — render compiled manuscript to PDF
+#   make all        — compile + pdf
+#   make units      — run all result units
+#   make test       — run tests
+#   make lint       — run ruff linter
+#   make clean      — remove generated files
 # ============================================================
 
 PYTHON ?= uv run python
 PAPER_FORGE ?= uv run paper-forge
 
-.PHONY: all compile check pdf units test lint clean help
+.PHONY: all compile check check-refs tokens pdf units test lint clean help
 
 # Default target
 all: compile pdf
@@ -27,9 +29,17 @@ units:
 compile:
 	$(PAPER_FORGE) compile
 
-# Validate that all placeholders have corresponding result keys
+# Validate placeholders, literals, verdicts, and citations
 check:
 	$(PAPER_FORGE) check
+
+# Cross-check every citation key against the bibliography; report coverage
+check-refs:
+	$(PAPER_FORGE) check-refs
+
+# Print the reference-token table (hand to a writer before they cite)
+tokens:
+	$(PAPER_FORGE) tokens
 
 # Render the compiled markdown to PDF via pandoc
 pdf:
@@ -66,8 +76,10 @@ help:
 	@echo "  make all       — compile + pdf (default)"
 	@echo "  make units     — run all result unit scripts"
 	@echo "  make compile   — fill placeholders in manuscript template"
-	@echo "  make check     — validate placeholders against results"
-	@echo "  make pdf       — render manuscript to PDF"
+	@echo "  make check      — validate placeholders, literals, verdicts, citations"
+	@echo "  make check-refs — cross-check citations against bibliography"
+	@echo "  make tokens     — print the reference-token table"
+	@echo "  make pdf        — render manuscript to PDF"
 	@echo "  make pipeline  — units → compile → pdf"
 	@echo "  make test      — run pytest"
 	@echo "  make lint      — run ruff linter"
