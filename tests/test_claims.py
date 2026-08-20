@@ -144,3 +144,62 @@ def test_check_claims_reads_file(tmp_path):
     template = tmp_path / "manuscript_template.md"
     template.write_text("The groups did not differ.\n", encoding="utf-8")
     assert [f.text for f in check_claims(template)] == ["did not differ"]
+
+
+# --- what "carries a citation" means depends on the bibliography ------------
+#
+# Granting the exemption on citation-shaped prose inverts this guard in a project that has
+# a .bib: a real \citep{key} is not prose-shaped and gets flagged, while a fabricated
+# "(Klein et al. 2010)" reads as a citation and silences the guard. These pin the fix.
+
+BIB_KEYS = {"klein2010"}
+
+
+def test_resolvable_latex_citation_exempts_the_sentence():
+    content = r"Sleep loss significantly impairs dances \citep{klein2010}."
+    assert _texts(content, bib_keys=BIB_KEYS) == []
+
+
+def test_resolvable_pandoc_citation_exempts_the_sentence():
+    assert _texts("Sleep loss significantly impairs dances [@klein2010].", bib_keys=BIB_KEYS) == []
+
+
+def test_unresolvable_key_does_not_exempt():
+    # The key looks like a citation but is in no bibliography — the half-hallucination.
+    content = r"Sleep loss significantly impairs dances \citep{ghost2021}."
+    assert _texts(content, bib_keys=BIB_KEYS) == ["significantly"]
+
+
+def test_prose_attribution_does_not_exempt_when_a_bibliography_exists():
+    # The whole point of the fix: this used to be exempt *because* it was not a citation.
+    content = "Sleep loss significantly impairs dances (Klein et al. 2010)."
+    assert _texts(content, bib_keys=BIB_KEYS) == ["significantly"]
+
+
+def test_numeric_marker_does_not_exempt_when_a_bibliography_exists():
+    assert _texts("Sleep loss significantly impairs dances [12].", bib_keys=BIB_KEYS) == [
+        "significantly"
+    ]
+
+
+def test_prose_attribution_still_exempts_without_a_bibliography():
+    # A numbered-reference manuscript has no keys to resolve; prose *is* the citation.
+    assert _texts("Sleep loss significantly impairs dances (Klein et al. 2010).") == []
+
+
+def test_keyed_exemption_is_per_sentence_not_per_line():
+    # A real citation in the second sentence must not excuse a verdict in the first.
+    content = r"Dance significantly tracks sleep. Prior work agrees \citep{klein2010}."
+    assert _texts(content, bib_keys=BIB_KEYS) == ["significantly"]
+
+
+def test_resolvable_reference_token_exempts_the_sentence():
+    # A token is as resolved as a cite key, so it must earn the same exemption. The
+    # identifier in the text is a digest, which is why `bib_keys` carries digests too.
+    content = "Sleep loss significantly impairs dances [ref:0123456789ab]."
+    assert _texts(content, bib_keys={"0123456789ab"}) == []
+
+
+def test_invented_reference_token_does_not_exempt():
+    content = "Sleep loss significantly impairs dances [ref:deadbeefcafe]."
+    assert _texts(content, bib_keys={"0123456789ab"}) == ["significantly"]

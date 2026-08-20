@@ -15,11 +15,13 @@ placeholder-based templating.
 paper-forge/
 ├── paper_forge/                  # Core Python package
 │   ├── __init__.py
-│   ├── cli.py                    # argparse CLI (init/compile/check/check-rqs/pdf)
+│   ├── cli.py                    # argparse CLI (init/compile/check/check-refs/check-rqs/pdf)
 │   ├── compiler.py               # project.yaml loader + placeholder compilation
 │   ├── formatters.py             # Number formatters (p, r, int, fmt2, pct, pct0, …)
 │   ├── literals.py               # Numeric-literal guard (hardcoded-number detector)
 │   ├── claims.py                 # Verdict-claim guard (hardcoded-verdict detector)
+│   ├── citations.py              # Citation guard (bibtex parser + cite-key resolution/coverage)
+│   ├── sentences.py              # Abbreviation-aware sentence segmentation (shared by guards)
 │   ├── research_questions.py     # RQ registry parser + check-rqs enforcement
 │   ├── interpretation.py         # Optional compile-time interpretation rules engine
 │   ├── provenance.py             # Git provenance & environment capture
@@ -70,11 +72,13 @@ paper-forge/
 
 | Module | Purpose |
 |--------|---------|
-| `cli.py` | argparse CLI: `init`, `compile`, `check`, `check-rqs`, `gate`, `pdf` |
+| `cli.py` | argparse CLI: `init`, `compile`, `check`, `check-refs`, `tokens`, `check-rqs`, `gate`, `pdf` |
 | `compiler.py` | Loads `project.yaml`, reads JSONs, resolves `{{prefix.key:fmt}}` placeholders; strips `pf-allow-literal` directives from the output |
 | `formatters.py` | Formatting functions (`fmt_p()`, `fmt_r()`, `fmt_int()`, `fmt_pct0()`, …) and the `FORMATTERS` registry |
 | `literals.py` | Numeric-literal guard: flags hardcoded numbers in the template (`check --strict-literals`) |
-| `claims.py` | Verdict-claim guard: flags statistical verdicts asserted in prose instead of resolved via `{{interp.*}}` (`check --strict-claims`). Exempts cited sentences and `pf-allow-claim` lines |
+| `claims.py` | Verdict-claim guard: flags statistical verdicts asserted in prose instead of resolved via `{{interp.*}}` (`check --strict-claims`). Exempts a sentence citing a **resolvable** key when `bib_keys` is supplied, citation-shaped prose otherwise, and `pf-allow-claim` lines |
+| `sentences.py` | Abbreviation-aware sentence segmentation. Both guards need sentence granularity because manuscript markdown puts a paragraph on one line; kept separate so `claims.py` can depend on `citations.py` without a cycle |
+| `citations.py` | Citation guard: a dependency-free BibTeX parser plus LaTeX/pandoc cite extraction; `check_citations()` reports unresolvable keys, duplicate keys and bibliography coverage (`check-refs`). Exposes `BibEntry` so a DOI verifier can be layered on top |
 | `research_questions.py` | Parses the RQ registry; `check_research_questions()` powers `check-rqs` |
 | `interpretation.py` | Optional `InterpretationEngine` — derives phrases from result values at compile time (enable via `interpretations:` in project.yaml). `load_function_plugin()` lets a project register its own verdict functions via `interpretation_functions:`; it must run before `load_rules()`, which rejects unknown function names |
 | `provenance.py` | `get_git_provenance()` / `get_environment()` — git hash, dirty state, package list |

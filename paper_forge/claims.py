@@ -18,10 +18,21 @@ What is *not* flagged:
 
 - text inside ``{{...}}`` placeholders — a verdict resolved by the interpretation engine is
   exactly what this guard wants to see;
-- sentences carrying a citation (``(Klein et al. 2010)``, ``[12]``) — a claim about someone
-  else's published result is static by nature and does not drift with your data;
+- sentences carrying a citation — a claim about someone else's published result is static
+  by nature and does not drift with your data;
 - code, YAML front-matter, and the References section;
 - anything on a line marked ``<!-- pf-allow-claim: reason -->``.
+
+**What counts as "carrying a citation" depends on whether the project has a bibliography.**
+Pass ``bib_keys`` (every key defined in the ``.bib``) and a sentence is exempt only when it
+cites a key that actually resolves. Without it — a project using numbered markers and a
+hand-written reference list — the guard falls back to recognising citation-*shaped* prose.
+
+That distinction is the whole point. Granting the exemption on prose shape alone inverts
+the guard in a ``.bib`` project: a real ``\\citep{klein2010}`` is not prose-shaped and gets
+flagged, while a fabricated ``(Klein et al. 2010)`` that appears in no bibliography reads as
+a citation and silences the guard. A hallucinated attribution then does two things at once —
+invents a reference *and* exempts the verdict attached to it.
 
 Escape hatch — mark an intentional static claim with an inline HTML comment on the same
 line::
@@ -36,6 +47,9 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from pathlib import Path
+
+from paper_forge.citations import find_citations
+from paper_forge.sentences import mask_sentences
 
 # Verdict vocabulary. Each entry is (category, pattern). The set is deliberately
 # high-precision: a false positive teaches people to switch the guard off, which costs
@@ -98,7 +112,12 @@ _INLINE_PROTECTED: tuple[re.Pattern[str], ...] = (
     re.compile(r"<!--.*?-->"),  # HTML comments
 )
 
-# A sentence containing any of these is a claim about published work, not about your data.
+# Citation-shaped prose, used ONLY as the fallback exemption for projects with no
+# bibliography (see the module docstring). It is deliberately loose — recall matters more
+# than precision when the alternative is flagging every literature claim in a numbered-
+# reference manuscript. The precision-oriented counterpart, which reports such prose as a
+# *problem* in a .bib project, is `citations._PROSE_ATTRIBUTION`.
+#
 # Deliberately case-SENSITIVE: the leading capital is what distinguishes an author name
 # from ordinary prose. Adding re.IGNORECASE would make "sleep and dominates" look like
 # "Smith and Jones" and silently exempt real verdicts from the guard.
@@ -114,27 +133,6 @@ _FENCE = re.compile(r"^\s*(?:```|~~~)")
 _REFERENCES = re.compile(r"^(#{1,6})\s+(?:\d+\.?\s+)?references\b", re.IGNORECASE)
 _HEADING = re.compile(r"^(#{1,6})\s+")
 _FRONTMATTER_FENCE = "---"
-
-# Abbreviations whose trailing period must not end a sentence. Masked to an equal-length
-# token before splitting so offsets are preserved, then the split is done on the mask.
-_ABBREVIATIONS = (
-    "et al.",
-    "e.g.",
-    "i.e.",
-    "cf.",
-    "vs.",
-    "approx.",
-    "ca.",
-    "Fig.",
-    "Figs.",
-    "Eq.",
-    "Tab.",
-    "Ref.",
-    "Dr.",
-    "Prof.",
-)
-
-_SENTENCE_BOUNDARY = re.compile(r"(?<=[.!?])\s+")
 
 
 @dataclass(frozen=True)
@@ -153,51 +151,29 @@ def _mask(line: str, pattern: re.Pattern[str]) -> str:
     return pattern.sub(lambda m: " " * (m.end() - m.start()), line)
 
 
-def _mask_abbreviations(line: str) -> str:
-    """Blank out the periods in known abbreviations so they don't end a sentence.
-
-    The result is only used to *locate* sentence boundaries; the original text is what
-    gets reported, so replacing '.' with a space here is safe and keeps every offset.
-    """
-    out = line
-    for abbr in _ABBREVIATIONS:
-        idx = 0
-        while True:
-            found = out.lower().find(abbr.lower(), idx)
-            if found == -1:
-                break
-            out = out[:found] + abbr.replace(".", " ") + out[found + len(abbr) :]
-            idx = found + len(abbr)
-    return out
-
-
-def _mask_cited_sentences(line: str) -> str:
+def _mask_cited_sentences(line: str, bib_keys: set[str] | None) -> str:
     """Blank out every sentence that carries a citation.
 
     A verdict attributed to published work is static by definition, so it must not be
-    forced through the interpretation engine. Sentence granularity matters: manuscript
-    markdown often puts a whole paragraph on one line, so a line-level rule would let a
-    citation anywhere in the paragraph excuse every claim in it.
+    forced through the interpretation engine.
+
+    With ``bib_keys``, "carries a citation" means *cites a key that resolves to a
+    bibliography entry* — an unresolvable or fabricated attribution earns no exemption.
+    Without it, the guard falls back to citation-shaped prose, which is the right reading
+    for a manuscript whose references are numbered markers and a hand-written list.
     """
-    boundaries = _mask_abbreviations(line)
-    out = list(line)
-    start = 0
-    for match in _SENTENCE_BOUNDARY.finditer(boundaries):
-        end = match.start()
-        if _CITATION.search(line[start:end]):
-            for i in range(start, end):
-                out[i] = " "
-        start = match.end()
-    if _CITATION.search(line[start:]):
-        for i in range(start, len(line)):
-            out[i] = " "
-    return "".join(out)
+    if bib_keys is None:
+        return mask_sentences(line, lambda s, e: bool(_CITATION.search(line[s:e])))
+
+    resolved = [c.column - 1 for c in find_citations(line) if c.key in bib_keys]
+    return mask_sentences(line, lambda s, e: any(s <= col < e for col in resolved))
 
 
 def find_verdict_claims(
     content: str,
     allow: list[str] | None = None,
     extra_patterns: list[str] | None = None,
+    bib_keys: set[str] | None = None,
 ) -> list[ClaimFinding]:
     """Find statistical verdicts asserted directly in manuscript prose.
 
@@ -207,6 +183,11 @@ def find_verdict_claims(
             project-specific exceptions.
         extra_patterns: Optional regex strings adding project-specific verdict
             vocabulary, reported under the category ``"custom"``.
+        bib_keys: Every identifier that resolves to a bibliography entry — cite keys and
+            reference-token digests alike. When given, only a
+            sentence citing a key that *resolves* is exempt from the guard; when omitted,
+            the guard falls back to recognising citation-shaped prose. See the module
+            docstring for why the difference matters.
 
     Returns:
         A list of :class:`ClaimFinding` in document order. Empty if every verdict in the
@@ -262,7 +243,7 @@ def find_verdict_claims(
             line = _mask(line, pattern)
         for pattern in allow_res:
             line = _mask(line, pattern)
-        line = _mask_cited_sentences(line)
+        line = _mask_cited_sentences(line, bib_keys)
 
         # Patterns overlap by design — "no significant difference" matches both the
         # null-claim and significance vocabularies. Report the widest span once rather
@@ -298,6 +279,7 @@ def check_claims(
     template_path: str | Path,
     allow: list[str] | None = None,
     extra_patterns: list[str] | None = None,
+    bib_keys: set[str] | None = None,
 ) -> list[ClaimFinding]:
     """Scan a template file for verdicts asserted in prose.
 
@@ -305,6 +287,8 @@ def check_claims(
         template_path: Path to the manuscript template markdown file.
         allow: Optional project-specific allow regexes.
         extra_patterns: Optional project-specific verdict vocabulary.
+        bib_keys: Every key defined in the project bibliography; see
+            :func:`find_verdict_claims`.
 
     Returns:
         A list of :class:`ClaimFinding` (empty if the file is clean or missing).
@@ -316,6 +300,7 @@ def check_claims(
         path.read_text(encoding="utf-8"),
         allow=allow,
         extra_patterns=extra_patterns,
+        bib_keys=bib_keys,
     )
 
 

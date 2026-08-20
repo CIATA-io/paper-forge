@@ -181,7 +181,14 @@ result the data no longer supports is the most expensive version of this bug.
 because "it's just a summary".
 
 **Introduction.** Mostly static. Claims about published work are exempt and need no
-placeholder — the guard skips any sentence carrying a citation. End with the questions
+placeholder — but only when the sentence cites a key that **resolves** to a real entry in
+the project's `.bib`. Writing `(Klein et al. 2010)` in the prose exempts nothing and is
+reported as an unkeyed attribution: it cites nothing, citeproc ignores it, and it never
+reaches the reference list. So cite only keys you have read in the `.bib`; where you need a
+source you do not have, leave `<!-- TODO(cite): ... -->` and say so. With reference
+tokens the rule is sharper still: a token is derived from its entry, so one you did not
+copy from `paper-forge tokens` cannot resolve — composing one is fabrication by
+construction, and the gate names it as such. End with the questions
 from Phase 1, phrased as questions, not as answers.
 
 **Methods.** Static prose plus placeholders for anything derived: sample sizes, thresholds,
@@ -213,12 +220,14 @@ restating *whether* the effect holds is not.
 paper-forge gate
 ```
 
-Four deterministic checks, all must pass:
+Five deterministic checks, all must pass:
 
 1. **strict compile** — every placeholder resolves
 2. **numeric-literal guard** — no hardcoded numbers
 3. **verdict-claim guard** — no hardcoded verdicts
-4. **research-question check** — every unit serves a declared RQ
+4. **citation guard** — every cite key and `[ref:…]` token resolves; no attribution
+   written as bare prose
+5. **research-question check** — every unit serves a declared RQ
 
 For findings that are genuinely static, annotate deliberately — never to silence a real
 verdict:
@@ -226,11 +235,12 @@ verdict:
 ```markdown
 Colonies were housed at 34 °C. <!-- pf-allow-literal: apparatus constant -->
 Sleep deprivation impairs dances. <!-- pf-allow-claim: prior literature, uncited here -->
+Follow @nature for updates. <!-- pf-allow-cite: social handle, not a citation -->
 ```
 
 Reaching for an allow-comment on a claim about *your own* results means the sentence needs
 an interpretation rule instead. Recurring exceptions belong in `project.yaml`
-(`literals.allow`, `claims.allow`) with a comment saying why.
+(`literals.allow`, `claims.allow`, `citations.allow`) with a comment saying why.
 
 Then read the compiled output as prose:
 

@@ -324,6 +324,128 @@ This is what turns *"numbers → prose, never the reverse"* from a guideline int
 
 ---
 
+## Citations
+
+A citation is the one manuscript element that looks equally plausible whether or not it
+exists. `\citep{smith2019}` compiles, reads well, and survives every other guard — only
+pandoc/BibTeX notices, and only as a warning buried in build output. `check-refs` makes
+that a first-class check:
+
+```bash
+paper-forge check-refs                 # resolution + coverage (warnings)
+paper-forge check-refs --strict        # unresolvable keys become errors
+paper-forge check-refs --bib other.bib # check against a specific bibliography
+```
+
+```
+  Bibliography (project.yaml (rendering.bibliography)): references.bib
+  Coverage: 34/41 bibliography entries cited (83%); 96 citation(s) in the manuscript.
+  Never cited (7): berger2004, chen2018, ...
+
+  ERROR: 1 citation problem(s), 1 unresolvable key(s):
+    line 88:41  [undefined-key] 'smith2019' cited via \citep has no entry in the bibliography
+```
+
+It reports three things:
+
+| Check | Meaning |
+|-------|---------|
+| `hallucinated-token` | A well-formed `[ref:…]` token that matches no entry. A token is derived, never guessed — so this is *certain* evidence of an invented citation, not a heuristic |
+| `malformed-token` | Token-shaped text that is not a token — the writer failed to copy one |
+| `duplicate-work` | Two cite keys describing the same work (same DOI, or same author/year/title) |
+| `undefined-key` | A cited key with no bibliography entry — the signature of a half-hallucinated citation: the prose was written, the entry never was |
+| `unkeyed-attribution` | An author-year attribution typed as prose (`(Klein et al. 2010)`) in a sentence that cites nothing. In a `.bib` project this is never a citation: citeproc ignores it, so it never reaches the reference list |
+| `duplicate-key` | A key defined twice; BibTeX keeps the first and silently discards the second |
+| coverage | How many bibliography entries the manuscript actually cites, and which it never does |
+
+Both citation syntaxes are recognised: LaTeX (`\cite`, `\citep`, `\textcite`,
+`\autocite`, `\nocite`, …) and pandoc (`[@key]`, `[-@key; @other]`, bare `@key`). Fenced
+code, inline code, links, URLs and email addresses are not mistaken for citations. For an
+`@` that genuinely isn't one:
+
+```markdown
+Follow @nature for updates. <!-- pf-allow-cite: social handle -->
+```
+
+paper-forge finds the bibliography from `citations.bibliography`, then
+`rendering.bibliography`, then the manuscript's `bibliography:` front-matter, then any
+`.bib` next to `project.yaml`. Configure enforcement in `project.yaml`:
+
+```yaml
+citations:
+  bibliography: "references.bib"
+  enforce: true                  # unresolvable keys fail `check` (same as --strict)
+  min_coverage: 0                # e.g. 1.0 to also fail when an entry is never cited
+  flag_prose_attributions: true  # report "(Author Year)" typed instead of a citation
+  expand_tokens: auto            # [ref:…] -> \cite{key} / [@key]; auto|pandoc|latex|off
+  allow: []                      # regexes for '@'-shaped text that is not a citation
+```
+
+### Why this also fixes the verdict guard
+
+The verdict-claim guard exempts sentences that cite published work — a claim about someone
+else's result is static and shouldn't be forced through `{{interp.*}}`. That exemption used
+to be granted on citation-*shape* in prose, with no bibliography lookup, which inverted the
+guard in any `.bib` project:
+
+| Sentence | Before | Now (with a bibliography) |
+|---|---|---|
+| `... significantly impairs dances \citep{klein2010}.` | **flagged** — a false positive on a real citation | exempt |
+| `... significantly impairs dances [@klein2010].` | **flagged** | exempt |
+| `... significantly impairs dances \citep{ghost2021}.` | flagged | flagged — the key resolves to nothing |
+| `... significantly impairs dances (Klein et al. 2010).` | **exempt** — a fabricated attribution silenced the guard | flagged |
+
+So a hallucinated attribution used to do two things at once: invent a reference *and*
+exempt the verdict attached to it. Now the exemption requires a key that resolves.
+
+Projects with **no** bibliography are unchanged — a numbered-reference manuscript with a
+hand-written list has no keys to resolve, so citation-shaped prose still grants the
+exemption there.
+
+> **What this does not check.** An entry invented wholesale — plausible title, invented
+> authors and venue — is internally consistent and passes. Resolution proves the *key*
+> exists, not that the *paper* does. Verifying that requires resolving each entry's DOI
+> against a registry (Crossref, OpenAlex); `paper_forge.citations` exposes the parsed
+> `BibEntry` objects so that check can be layered on top.
+
+### Reference tokens
+
+A cite key is **guessable**: `smith2019` is exactly the string a language model invents.
+That gives two failure modes, and key resolution only catches one — an invented key that
+happens to collide with a real entry yields a real reference attached to a claim it does
+not support, which nothing structural can see.
+
+A reference token is **not guessable**. It is derived from the bibliography entry, so a
+writer can only cite by copying one it was handed:
+
+```bash
+paper-forge tokens          # the table you give the writer
+```
+```
+[ref:2425b69172b7]  lymburn2021    2021    Reservoir computing with swarms
+[ref:ebebc395dc35]  frisch1967     1967    The Dance Language and Orientation of Bees
+```
+
+```markdown
+Swarms can act as reservoirs [ref:2425b69172b7].
+```
+
+`compile` expands each token to a real citation — `\cite{lymburn2021}`, or `[@lymburn2021]`
+when the render config passes `--citeproc` (`citations.expand_tokens: auto | pandoc | latex
+| off`). A token that resolves to nothing **fails the gate and is left in the output**: a
+generated-report resolver strips such tokens so the reader never sees one, but a manuscript
+is authored, and deleting the token would erase the evidence that it was invented.
+
+Because the token identifies the *work* rather than the key, it survives a key rename, is
+identical across manuscripts citing the same paper, and makes two entries for one paper
+collide into a single token — reporting `duplicate-work` for free.
+
+The scheme is taken from `auto_deep_research`'s `[ref:…]` tokens, keeping its distinction
+between a *hallucinated* token (well-formed, resolves to nothing) and a *malformed* one
+(the writer failed to copy an identifier at all).
+
+---
+
 ## Research Questions
 
 Every result unit should exist to answer a **declared research question**. paper-forge makes
@@ -386,6 +508,14 @@ research_questions: "manuscript/research_questions.md"
 literals:
   enforce: false          # true = hardcoded literals fail `check` (like --strict-literals)
   allow: []               # substrings always permitted in the template
+
+# Citation guard (optional; defaults shown). The bibliography also falls back to
+# rendering.bibliography, the manuscript front-matter, then any *.bib beside this file.
+citations:
+  bibliography: "references.bib"
+  enforce: false          # true = unresolvable cite keys fail `check` (like --strict-refs)
+  min_coverage: 0         # >0 also fails when too few bibliography entries are cited
+  allow: []               # regexes for '@'-shaped text that is not a citation
 
 execution:
   python: "uv run python"
@@ -477,9 +607,11 @@ The Makefile targets wrap the `paper-forge` CLI, which you can also call directl
 |---------|-------------|
 | `paper-forge init [dir]` | Scaffold a new project |
 | `paper-forge compile [--strict]` | Fill placeholders → compiled markdown |
-| `paper-forge check [--strict-literals] [--no-literals]` | Validate placeholders + numeric-literal guard |
+| `paper-forge check [--strict-literals] [--strict-claims] [--strict-refs]` | Validate placeholders + the literal, verdict and citation guards |
+| `paper-forge check-refs [--strict] [--bib PATH]` | Cross-check citations against the bibliography, report coverage |
+| `paper-forge tokens [--format table\|json]` | Print the reference token for each bibliography entry |
 | `paper-forge check-rqs` | Verify every result unit serves a declared research question |
-| `paper-forge gate` | Run the full consistency gate: strict compile + literal guard + check-rqs |
+| `paper-forge gate` | Run the full consistency gate: strict compile + all guards + check-rqs |
 | `paper-forge pdf [-o out.pdf]` | Render compiled markdown to PDF |
 
 All commands accept `--config PATH` (default `project.yaml`).

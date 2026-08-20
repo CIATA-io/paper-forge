@@ -276,6 +276,88 @@ def _resolve_derived(
             all_results[key] = f"[DERIVED ERROR: {e}]"
 
 
+def _expand_reference_tokens(
+    compiled: str,
+    config: dict[str, Any],
+    base_dir: Path,
+) -> tuple[str, list[str]]:
+    """Expand ``[ref:…]`` tokens to real citations, reporting any that do not resolve.
+
+    A reference token is opaque and derived from the bibliography entry, so a writer can
+    only cite by copying one. That makes an unresolvable token *certain* evidence of a
+    fabricated citation rather than a heuristic judgement — and it is why this function
+    leaves the token in place and reports it instead of deleting it. Stripping is right
+    for a generated report, where the reader must never see a raw token; a manuscript is
+    authored, and removing the token would erase the evidence that it was invented.
+
+    The expansion target follows ``citations.expand_tokens``: ``pandoc`` (``[@key]``),
+    ``latex`` (``\\cite{key}``), ``off``, or ``auto`` (the default) which picks pandoc when
+    the render config passes ``--citeproc`` and LaTeX otherwise.
+
+    Returns:
+        ``(text, errors)`` — the expanded manuscript and one message per unresolved token.
+    """
+    from paper_forge.citations import (
+        MALFORMED_TOKEN_COMMAND,
+        TOKEN_COMMAND,
+        build_token_map,
+        find_citations,
+        load_bibliography,
+        resolve_bibliography,
+    )
+
+    cite_cfg = config.get("citations") or {}
+    mode = str(cite_cfg.get("expand_tokens", "auto")).lower()
+    if mode == "off":
+        return compiled, []
+
+    template_path = base_dir / config["manuscript"]
+    bib_paths, _ = resolve_bibliography(config, base_dir, template_path)
+    if not bib_paths:
+        return compiled, []
+
+    citations = find_citations(compiled)
+    tokens = [c for c in citations if c.command in (TOKEN_COMMAND, MALFORMED_TOKEN_COMMAND)]
+    if not tokens:
+        return compiled, []
+
+    entries, _ = load_bibliography(bib_paths)
+    token_map, _ = build_token_map(entries)
+
+    if mode == "auto":
+        render_cfg = config.get("render", {}) or {}
+        args = [str(a) for a in render_cfg.get("pandoc_args", [])]
+        args += [str(a) for a in render_cfg.get("extra_args", [])]
+        mode = "pandoc" if any("citeproc" in a for a in args) else "latex"
+
+    errors: list[str] = []
+
+    def _replace(match: re.Match) -> str:
+        digest = match.group(1).lower()
+        key = token_map.get(digest)
+        if key is None:
+            errors.append(
+                f"[ref:{digest}] resolves to no bibliography entry — a token can only be "
+                "copied, never derived, so this citation was invented"
+            )
+            return match.group(0)  # keep it visible; do not erase the evidence
+        return f"[@{key}]" if mode == "pandoc" else f"\\cite{{{key}}}"
+
+    from paper_forge.citations import _MALFORMED_TOKEN_RE, _TOKEN_RE
+
+    expanded = _TOKEN_RE.sub(_replace, compiled)
+    # An unresolved token is deliberately left in place, and _MALFORMED_TOKEN_RE matches
+    # any [ref:…]-shaped run — so blank the well-formed ones first, or a single invented
+    # citation is reported twice, once under each name.
+    residual = _TOKEN_RE.sub(lambda m: " " * (m.end() - m.start()), expanded)
+    for match in _MALFORMED_TOKEN_RE.finditer(residual):
+        errors.append(
+            f"'{match.group(0)}' is token-shaped but is not a reference token; "
+            "copy tokens from `paper-forge tokens`"
+        )
+    return expanded, errors
+
+
 def compile_manuscript(
     config_path: str | Path | None = None,
     check_only: bool = False,
@@ -381,14 +463,27 @@ def compile_manuscript(
     # Strip numeric-literal guard directives — they are source-only annotations.
     compiled = _PF_DIRECTIVE_RE.sub("", compiled)
 
+    # Expand [ref:…] reference tokens to real citations.
+    compiled, token_errors = _expand_reference_tokens(compiled, config, base_dir)
+
     if errors:
         print(f"\n  WARNING: {len(errors)} unresolved placeholder(s):", file=sys.stderr)
         for err in errors:
             print(f"    - {err}", file=sys.stderr)
-        if check_only or strict:
-            sys.exit(1)
     else:
         print(f"  Successfully resolved all {resolved_count} placeholders")
+
+    if token_errors:
+        print(
+            f"\n  ERROR: {len(token_errors)} unresolved reference token(s) — "
+            "left in the output rather than deleted, so the fabrication stays visible:",
+            file=sys.stderr,
+        )
+        for err in token_errors:
+            print(f"    - {err}", file=sys.stderr)
+
+    if (errors or token_errors) and (check_only or strict):
+        sys.exit(1)
 
     # Write output
     if not check_only:

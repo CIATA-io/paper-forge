@@ -32,6 +32,17 @@ claims:
   allow: [] # regexes for claims that are genuinely static
   extra_patterns: [] # project-specific verdict vocabulary to also catch
 
+# Guard: every citation resolves to a real entry in the bibliography.
+citations:
+  # Bibliography used to resolve cite keys. Falls back to rendering.bibliography,
+  # the manuscript front-matter, then any *.bib next to this file.
+  # bibliography: "references.bib"
+  enforce: false # `paper-forge gate` enforces regardless
+  min_coverage: 0 # e.g. 1.0 to also fail when a bib entry is never cited
+  flag_prose_attributions: true # "(Klein et al. 2010)" typed in the text cites nothing
+  expand_tokens: auto # auto | pandoc | latex | off
+  allow: [] # regexes for '@'/\cite-shaped text that is not a citation
+
 execution:
   python: "uv run python"
 

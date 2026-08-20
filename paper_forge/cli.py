@@ -1,12 +1,14 @@
 """Command-line interface for paper-forge.
 
 Provides the ``paper-forge`` CLI with subcommands:
-    - ``init``      — scaffold a new project
-    - ``compile``   — compile manuscript (resolve placeholders)
-    - ``check``     — validate placeholders + numeric-literal guard
-    - ``check-rqs`` — verify every result unit serves a declared research question
-    - ``gate``      — run the full consistency gate (compile + check + check-rqs)
-    - ``pdf``       — render compiled markdown to PDF
+    - ``init``       — scaffold a new project
+    - ``compile``    — compile manuscript (resolve placeholders)
+    - ``check``      — validate placeholders + literal, claim and citation guards
+    - ``check-refs`` — cross-check citations against the bibliography, report coverage
+    - ``tokens``     — print the reference token for each bibliography entry
+    - ``check-rqs``  — verify every result unit serves a declared research question
+    - ``gate``       — run the full consistency gate (compile + check + check-rqs)
+    - ``pdf``        — render compiled markdown to PDF
 """
 
 from __future__ import annotations
@@ -58,7 +60,7 @@ interpretations: interpretations.yaml
 # register(engine) and use its functions in interpretations.yaml.
 # interpretation_functions: scripts/interp_functions.py
 
-# Guards. `paper-forge gate` enforces both regardless of these settings.
+# Guards. `paper-forge gate` enforces all of them regardless of these settings.
 literals:
   enforce: false # no hardcoded numbers in the template
   allow: []
@@ -66,6 +68,13 @@ claims:
   enforce: false # no hardcoded verdicts in the template
   allow: []
   extra_patterns: []
+citations:
+  # bibliography: "references.bib"   # else: rendering.bibliography, front-matter, *.bib
+  enforce: false # every cite key must resolve to a bibliography entry
+  min_coverage: 0 # >0 also fails when too few entries are cited
+  flag_prose_attributions: true # an attribution must be a citation, not prose
+  expand_tokens: auto # auto | pandoc | latex | off
+  allow: []
 
 execution:
   python: "uv run python"
@@ -322,18 +331,49 @@ def _check_literals(config_path: str, strict_literals: bool) -> int:
     return 1 if enforce else 0
 
 
+def _bibliography_keys(config: dict, base_dir: Path, template_path: Path) -> set[str] | None:
+    """Every identifier that resolves to a bibliography entry, or None if there is none.
+
+    That means cite keys *and* reference-token digests: a sentence cited as
+    ``[ref:3f2a9c1d4b6e]`` is exactly as resolved as one cited as ``\\citep{key}``, and
+    must earn the same exemption.
+
+    The verdict guard needs this to decide what "carries a citation" means. With a
+    bibliography, only a citation that *resolves* exempts a sentence; without one, the
+    guard falls back to citation-shaped prose (see :mod:`paper_forge.claims`).
+    """
+    from paper_forge.citations import build_token_map, load_bibliography, resolve_bibliography
+
+    bib_paths, _ = resolve_bibliography(config, base_dir, template_path)
+    if not bib_paths:
+        return None
+    entries, _ = load_bibliography(bib_paths)
+    if not entries:
+        # The bibliography is configured but yielded nothing — a mistyped path, an
+        # unreadable file, or an empty .bib. Returning an empty *set* would mean "a
+        # bibliography exists and nothing in the manuscript resolves", which flags every
+        # literature claim in the paper. The citation guard already reports the real
+        # cause once; fall back instead, so one root problem produces one error rather
+        # than an avalanche of unrelated ones.
+        return None
+    token_map, _ = build_token_map(entries)
+    return set(entries) | set(token_map)
+
+
 def _check_claims(config_path: str, strict_claims: bool) -> int:
     """Run the verdict-claim guard on the template. Returns an exit code delta."""
     from paper_forge.claims import check_claims, format_findings
     from paper_forge.compiler import load_project_config
 
     config = load_project_config(config_path)
-    template_path = Path(config_path).parent / config["manuscript"]
+    base_dir = Path(config_path).parent
+    template_path = base_dir / config["manuscript"]
     claim_cfg = config.get("claims", {}) or {}
     findings = check_claims(
         template_path,
         allow=claim_cfg.get("allow", []),
         extra_patterns=claim_cfg.get("extra_patterns", []),
+        bib_keys=_bibliography_keys(config, base_dir, template_path),
     )
 
     if not findings:
@@ -352,8 +392,86 @@ def _check_claims(config_path: str, strict_claims: bool) -> int:
     return 1 if enforce else 0
 
 
+def _check_refs(config_path: str, strict_refs: bool, bib_override: list[str] | None = None) -> int:
+    """Run the citation guard against the project bibliography. Returns an exit-code delta.
+
+    Resolution failures (a cited key with no entry) and duplicate keys are the errors.
+    Coverage is reported as a statistic and only fails the check when the project sets
+    ``citations.min_coverage`` — an uncited entry is untidy, not wrong.
+    """
+    from paper_forge.citations import (
+        check_citations,
+        format_coverage,
+        format_findings,
+        resolve_bibliography,
+    )
+    from paper_forge.compiler import load_project_config
+
+    config = load_project_config(config_path)
+    base_dir = Path(config_path).parent
+    template_path = base_dir / config["manuscript"]
+    cite_cfg = config.get("citations", {}) or {}
+
+    if bib_override:
+        bib_paths = [Path(p) for p in bib_override]
+        origin = "--bib"
+    else:
+        bib_paths, origin = resolve_bibliography(config, base_dir, template_path)
+
+    if not bib_paths:
+        print("  No bibliography configured — citation guard skipped.")
+        return 0
+
+    print(f"  Bibliography ({origin}): {', '.join(str(p) for p in bib_paths)}")
+    report = check_citations(
+        template_path,
+        bib_paths,
+        allow=cite_cfg.get("allow", []),
+        flag_prose_attributions=bool(cite_cfg.get("flag_prose_attributions", True)),
+    )
+    print(format_coverage(report))
+
+    exit_code = 0
+    enforce = strict_refs or bool(cite_cfg.get("enforce", False))
+    if report.findings:
+        label = "ERROR" if enforce else "WARNING"
+        undefined = sum(1 for f in report.findings if f.kind == "undefined-key")
+        unkeyed = sum(1 for f in report.findings if f.kind == "unkeyed-attribution")
+        detail = ", ".join(
+            part
+            for part in (
+                f"{undefined} unresolvable key(s)" if undefined else "",
+                f"{unkeyed} unkeyed attribution(s)" if unkeyed else "",
+            )
+            if part
+        )
+        print(
+            f"\n  {label}: {len(report.findings)} citation problem(s)"
+            + (f" — {detail}" if detail else "")
+            + ". A cited key must exist in the bibliography, and an attribution must be a "
+            "citation rather than prose (or mark the line with "
+            "'<!-- pf-allow-cite: reason -->'):",
+            file=sys.stderr,
+        )
+        print(format_findings(report.findings), file=sys.stderr)
+        exit_code |= 1 if enforce else 0
+    else:
+        print("  Every citation resolves to a bibliography entry.")
+
+    min_coverage = float(cite_cfg.get("min_coverage", 0) or 0)
+    if min_coverage and report.coverage < min_coverage:
+        print(
+            f"\n  ERROR: bibliography coverage {report.coverage:.0%} is below the "
+            f"required {min_coverage:.0%} ({len(report.uncited_keys)} entries never cited).",
+            file=sys.stderr,
+        )
+        exit_code |= 1
+
+    return exit_code
+
+
 def _cmd_check(args: argparse.Namespace) -> int:
-    """Check placeholders (and, unless disabled, hardcoded literals and verdicts)."""
+    """Check placeholders (and, unless disabled, literals, verdicts and citations)."""
     from paper_forge.compiler import compile_manuscript
 
     exit_code = 0
@@ -383,7 +501,101 @@ def _cmd_check(args: argparse.Namespace) -> int:
             print(f"ERROR (claim check): {e}", file=sys.stderr)
             return 1
 
+    if not getattr(args, "no_refs", False):
+        try:
+            exit_code |= _check_refs(args.config, getattr(args, "strict_refs", False))
+        except Exception as e:
+            print(f"ERROR (citation check): {e}", file=sys.stderr)
+            return 1
+
     return exit_code
+
+
+def _cmd_tokens(args: argparse.Namespace) -> int:
+    """Print the reference token for every bibliography entry.
+
+    This table is the artifact you hand a writer. A token is derived from the entry, so it
+    can be copied but never guessed — which is what makes an unresolvable token in the
+    manuscript certain evidence of a fabricated citation rather than a heuristic guess.
+    """
+    import json
+
+    from paper_forge.citations import (
+        build_token_map,
+        entry_token,
+        load_bibliography,
+        resolve_bibliography,
+    )
+    from paper_forge.compiler import load_project_config
+
+    try:
+        config = load_project_config(args.config)
+        base_dir = Path(args.config).parent
+        template_path = base_dir / config["manuscript"]
+
+        if args.bib:
+            bib_paths = [Path(b) for b in args.bib]
+        else:
+            bib_paths, origin = resolve_bibliography(config, base_dir, template_path)
+            if not bib_paths:
+                print(
+                    "ERROR: no bibliography configured — set 'citations.bibliography' in "
+                    "project.yaml or pass --bib.",
+                    file=sys.stderr,
+                )
+                return 1
+            print(f"  Bibliography ({origin})", file=sys.stderr)
+
+        entries, findings = load_bibliography(bib_paths)
+        _, dup_findings = build_token_map(entries)
+
+        if args.format == "json":
+            print(
+                json.dumps(
+                    {
+                        key: {
+                            "token": entry_token(entry),
+                            "type": entry.entry_type,
+                            "year": entry.year,
+                            "doi": entry.doi,
+                            "title": entry.fields.get("title", ""),
+                            "author": entry.fields.get("author", ""),
+                        }
+                        for key, entry in entries.items()
+                    },
+                    indent=2,
+                    ensure_ascii=False,
+                )
+            )
+        else:
+            for key, entry in entries.items():
+                title = entry.fields.get("title", "")
+                if len(title) > 58:
+                    title = title[:55] + "..."
+                print(f"{entry_token(entry)}  {key:<24}  {entry.year:<6}  {title}")
+
+        for finding in findings + dup_findings:
+            print(f"  WARNING [{finding.kind}] {finding.message}", file=sys.stderr)
+        print(f"\n  {len(entries)} entries.", file=sys.stderr)
+        return 0
+    except FileNotFoundError as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        return 1
+    except Exception as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        return 1
+
+
+def _cmd_check_refs(args: argparse.Namespace) -> int:
+    """Cross-check every citation against the bibliography and report coverage."""
+    try:
+        return _check_refs(args.config, args.strict, bib_override=args.bib)
+    except FileNotFoundError as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        return 1
+    except Exception as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        return 1
 
 
 # Lifecycle findings where the registry contradicts the manuscript or itself: hard.
@@ -504,6 +716,14 @@ def _cmd_gate(args: argparse.Namespace) -> int:
         rc |= _check_claims(args.config, strict_claims=True)
     except Exception as e:
         print(f"ERROR (claim check): {e}", file=sys.stderr)
+        rc = 1
+
+    # Citation guard — a no-op (and never a failure) when the project has no bibliography.
+    print("  [gate] citation guard ...")
+    try:
+        rc |= _check_refs(args.config, strict_refs=True)
+    except Exception as e:
+        print(f"ERROR (citation check): {e}", file=sys.stderr)
         rc = 1
 
     # Research-question check — only when a registry is present.
@@ -648,6 +868,63 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Skip the verdict-claim guard entirely.",
     )
+    check_parser.add_argument(
+        "--strict-refs",
+        action="store_true",
+        help="Treat unresolvable citation keys as errors (non-zero exit), not just "
+        "warnings. Also settable via 'citations.enforce' in project.yaml.",
+    )
+    check_parser.add_argument(
+        "--no-refs",
+        action="store_true",
+        help="Skip the citation guard entirely.",
+    )
+
+    # check-refs
+    check_refs_parser = subparsers.add_parser(
+        "check-refs",
+        help="Cross-check citations against the bibliography and report coverage",
+    )
+    check_refs_parser.add_argument(
+        "--config",
+        default="project.yaml",
+        help="Path to project.yaml (default: project.yaml)",
+    )
+    check_refs_parser.add_argument(
+        "--bib",
+        action="append",
+        default=None,
+        help="Bibliography file to check against (repeatable). Overrides project.yaml "
+        "and the manuscript front-matter.",
+    )
+    check_refs_parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="Treat unresolvable citation keys as errors (non-zero exit).",
+    )
+
+    # tokens
+    tokens_parser = subparsers.add_parser(
+        "tokens",
+        help="Print the reference token for every bibliography entry (hand this to a writer)",
+    )
+    tokens_parser.add_argument(
+        "--config",
+        default="project.yaml",
+        help="Path to project.yaml (default: project.yaml)",
+    )
+    tokens_parser.add_argument(
+        "--bib",
+        action="append",
+        default=None,
+        help="Bibliography file to read (repeatable). Overrides project.yaml.",
+    )
+    tokens_parser.add_argument(
+        "--format",
+        choices=("table", "json"),
+        default="table",
+        help="Output format (default: table)",
+    )
 
     # check-rqs
     check_rqs_parser = subparsers.add_parser(
@@ -711,6 +988,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         "init": _cmd_init,
         "compile": _cmd_compile,
         "check": _cmd_check,
+        "check-refs": _cmd_check_refs,
+        "tokens": _cmd_tokens,
         "check-rqs": _cmd_check_rqs,
         "gate": _cmd_gate,
         "pdf": _cmd_pdf,

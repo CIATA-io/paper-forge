@@ -39,6 +39,10 @@ _INLINE_PROTECTED = (
     re.compile(r"<[^>\s]+>"),  # <autolinks>/<tags>
     re.compile(r"<!--.*?-->"),  # HTML comments
     re.compile(r"\[\s*\d+(?:\s*[,–-]\s*\d+)*\s*\]"),  # citation markers [6], [1, 2], [3-5]
+    # Reference tokens ([ref:3f2a9c1d4b6e]). The digest is an identifier, not a number
+    # someone typed; the permissive shape also covers a malformed token, which the
+    # citation guard reports on its own — one root cause should raise one error.
+    re.compile(r"\[ref:[^\]\s]*\]"),
     re.compile(  # Table 1 / Figure 2A / Eq. 3 / Table S1
         r"\b(?:Table|Figure|Fig\.?|Panel|Eq\.?|Equation|Section|Supplementary(?:\s+\w+)?)"
         r"\s+S?\d+[A-Za-z]?\b"

@@ -124,3 +124,17 @@ def test_check_literals_missing_file_returns_empty(tmp_path):
 
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-v"]))
+
+
+def test_reference_token_digest_is_not_a_hardcoded_number():
+    """A token's hex digest is an identifier, not a number someone typed.
+
+    Without this the literal guard fires on every token in the manuscript, which would
+    make the whole reference-token workflow unusable with `paper-forge gate`.
+    """
+    from paper_forge.literals import find_literal_numbers
+
+    assert find_literal_numbers("Swarms compute [ref:2425b69172b7].") == []
+    # A malformed token is reported by the citation guard; it must not raise a second,
+    # unrelated error here.
+    assert find_literal_numbers("Swarms compute [ref:nothex1234].") == []
