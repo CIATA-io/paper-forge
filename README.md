@@ -363,6 +363,8 @@ It reports three things:
 | `duplicate-work` | Two cite keys describing the same work (same DOI, or same author/year/title) |
 | `undefined-key` | A cited key with no bibliography entry — the signature of a half-hallucinated citation: the prose was written, the entry never was |
 | `unkeyed-attribution` | An author-year attribution typed as prose (`(Klein et al. 2010)`) in a sentence that cites nothing. In a `.bib` project this is never a citation: citeproc ignores it, so it never reaches the reference list |
+| `modified-bibliography` | A verified `.bib` whose digest moved — something changed a bibliography a human signed off |
+| `unverified-entry` | A citation resolving into a `.bib` no human has verified (fatal only under `require_verified`) |
 | `duplicate-key` | A key defined twice; BibTeX keeps the first and silently discards the second |
 | coverage | How many bibliography entries the manuscript actually cites, and which it never does |
 
@@ -386,6 +388,7 @@ citations:
   min_coverage: 0                # e.g. 1.0 to also fail when an entry is never cited
   flag_prose_attributions: true  # report "(Author Year)" typed instead of a citation
   expand_tokens: auto            # [ref:…] -> \cite{key} / [@key]; auto|pandoc|latex|off
+  require_verified: false        # true = citing an unverified .bib fails the gate
   allow: []                      # regexes for '@'-shaped text that is not a citation
 ```
 
@@ -451,6 +454,41 @@ collide into a single token — reporting `duplicate-work` for free.
 The scheme is taken from `auto_deep_research`'s `[ref:…]` tokens, keeping its distinction
 between a *hallucinated* token (well-formed, resolves to nothing) and a *malformed* one
 (the writer failed to copy an identifier at all).
+
+### Who may write the bibliography
+
+Tokens guarantee every citation resolves to an entry **someone put in the `.bib`**. They say
+nothing about who. Minting is mechanical — hand `paper-forge tokens` a fabricated entry and it
+returns a perfectly valid token — so tokens *transfer* trust to the bibliography rather than
+creating it.
+
+`bibliography.lock` records where that trust comes from, which lets an agent help build a
+bibliography without being able to smuggle a reference into a finished paper:
+
+| State | Who may write | Citing it |
+|---|---|---|
+| **draft** — not in the lock | an agent may **create** a file (deep-research output, a first pass); a human edits freely while reviewing | reported, never silent |
+| **verified** — digest recorded | nobody | silent |
+| **modified** — verified, digest moved | — | **fails the gate in every mode** |
+
+```bash
+paper-forge verify-bib --note "DOIs spot-checked against Crossref"
+```
+
+```yaml
+citations:
+  require_verified: true    # citing an unverified entry fails the gate
+```
+
+`require_verified` is the load-bearing setting. Create-only is not by itself a safeguard — an
+agent that wants a fabricated citation can simply create a *new* draft file and cite that.
+What keeps a draft fabrication out of a submission is the gate refusing unverified entries.
+The digest does the other half: it catches an entry appended to a bibliography a human had
+already signed off, which no content check would notice.
+
+Off by default, so an existing project with a `.bib` and no lock keeps passing — a draft
+bibliography is a normal working state. Commit the lock: promoting a bibliography from draft
+to verified should be a reviewable diff, like any other change to the paper.
 
 ---
 
@@ -620,6 +658,7 @@ The Makefile targets wrap the `paper-forge` CLI, which you can also call directl
 | `paper-forge check [--strict-literals] [--strict-claims] [--strict-refs]` | Validate placeholders + the literal, verdict and citation guards |
 | `paper-forge check-refs [--strict] [--bib PATH]` | Cross-check citations against the bibliography, report coverage |
 | `paper-forge tokens [--format table\|json]` | Print the reference token for each bibliography entry |
+| `paper-forge verify-bib [FILE...] [--note TEXT]` | Record bibliography files as human-verified |
 | `paper-forge check-rqs` | Verify every result unit serves a declared research question |
 | `paper-forge gate` | Run the full consistency gate: strict compile + all guards + check-rqs |
 | `paper-forge pdf [-o out.pdf]` | Render compiled markdown to PDF |

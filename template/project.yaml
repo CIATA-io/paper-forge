@@ -41,6 +41,7 @@ citations:
   min_coverage: 0 # e.g. 1.0 to also fail when a bib entry is never cited
   flag_prose_attributions: true # "(Klein et al. 2010)" typed in the text cites nothing
   expand_tokens: auto # auto | pandoc | latex | off
+  require_verified: false # true = citing an unverified .bib fails the gate
   allow: [] # regexes for '@'/\cite-shaped text that is not a citation
 
 execution:

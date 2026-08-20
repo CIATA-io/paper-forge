@@ -6,6 +6,7 @@ Provides the ``paper-forge`` CLI with subcommands:
     - ``check``      — validate placeholders + literal, claim and citation guards
     - ``check-refs`` — cross-check citations against the bibliography, report coverage
     - ``tokens``     — print the reference token for each bibliography entry
+    - ``verify-bib`` — record bibliography files as human-verified
     - ``check-rqs``  — verify every result unit serves a declared research question
     - ``gate``       — strict compile + literal, verdict and citation guards + check-rqs
     - ``pdf``        — render compiled markdown to PDF
@@ -74,6 +75,7 @@ citations:
   min_coverage: 0 # >0 also fails when too few entries are cited
   flag_prose_attributions: true # an attribution must be a citation, not prose
   expand_tokens: auto # auto | pandoc | latex | off
+  require_verified: false # true = citing an unverified .bib fails the gate
   allow: []
 
 execution:
@@ -225,7 +227,7 @@ if __name__ == "__main__":
     if not makefile_path.exists():
         makefile_path.write_text(
             """\
-.PHONY: all units compile check check-refs tokens pdf pipeline clean help
+.PHONY: all units compile check check-refs tokens verify-bib pdf pipeline clean help
 
 PYTHON ?= uv run python
 
@@ -253,6 +255,10 @@ tokens:
 \t@echo "Reference tokens for this project's bibliography:"
 \t@uv run paper-forge tokens
 
+verify-bib:
+\t@echo "Recording the bibliography as human-verified..."
+\t@uv run paper-forge verify-bib
+
 pdf:
 \t@echo "Rendering PDF..."
 \t@uv run paper-forge pdf
@@ -265,7 +271,7 @@ clean:
 \trm -f manuscript/results/*.json
 
 help:
-\t@echo "Targets: all units compile check check-refs tokens pdf pipeline clean"
+\t@echo "Targets: all units compile check check-refs tokens verify-bib pdf pipeline clean"
 """,
             encoding="utf-8",
         )
@@ -407,6 +413,7 @@ def _check_refs(config_path: str, strict_refs: bool, bib_override: list[str] | N
     Coverage is reported as a statistic and only fails the check when the project sets
     ``citations.min_coverage`` — an uncited entry is untidy, not wrong.
     """
+    from paper_forge.bib_lock import format_status, status_for
     from paper_forge.citations import (
         check_citations,
         format_coverage,
@@ -431,18 +438,39 @@ def _check_refs(config_path: str, strict_refs: bool, bib_override: list[str] | N
         return 0
 
     print(f"  Bibliography ({origin}): {', '.join(str(p) for p in bib_paths)}")
+    statuses = status_for(bib_paths, base_dir)
+    print(format_status(statuses))
     report = check_citations(
         template_path,
         bib_paths,
         allow=cite_cfg.get("allow", []),
         flag_prose_attributions=bool(cite_cfg.get("flag_prose_attributions", True)),
+        bib_status={str(s.path): s.state for s in statuses},
     )
     print(format_coverage(report))
 
     exit_code = 0
     enforce = strict_refs or bool(cite_cfg.get("enforce", False))
+    require_verified = bool(cite_cfg.get("require_verified", False))
+
+    # The three severities are governed separately, because they answer different
+    # questions and `gate` must not conflate them:
+    #   modified-bibliography — always fatal. A file a human signed off has changed.
+    #   unverified-entry      — fatal only under `require_verified`. Otherwise a draft
+    #                           bibliography is a normal working state, and failing on it
+    #                           would break every existing project that has a .bib and no
+    #                           lock file the moment this shipped.
+    #   everything else       — the fabrication findings, governed by `enforce`/`--strict`.
+    modified = [f for f in report.findings if f.kind == "modified-bibliography"]
+    unverified = [f for f in report.findings if f.kind == "unverified-entry"]
+    fabrication = [f for f in report.findings if f.kind not in _TRUST_KINDS]
+
+    fatal = bool(modified) or (bool(unverified) and require_verified) or (fabrication and enforce)
+    if fatal:
+        exit_code |= 1
+
     if report.findings:
-        label = "ERROR" if enforce else "WARNING"
+        label = "ERROR" if fatal else "WARNING"
         undefined = sum(1 for f in report.findings if f.kind == "undefined-key")
         unkeyed = sum(1 for f in report.findings if f.kind == "unkeyed-attribution")
         detail = ", ".join(
@@ -462,7 +490,7 @@ def _check_refs(config_path: str, strict_refs: bool, bib_override: list[str] | N
             file=sys.stderr,
         )
         print(format_findings(report.findings), file=sys.stderr)
-        exit_code |= 1 if enforce else 0
+        # Severity was decided above by `fatal`; findings are printed either way.
     else:
         print("  Every citation resolves to a bibliography entry.")
 
@@ -517,6 +545,58 @@ def _cmd_check(args: argparse.Namespace) -> int:
             return 1
 
     return exit_code
+
+
+def _cmd_verify_bib(args: argparse.Namespace) -> int:
+    """Record bibliography files as human-verified.
+
+    Promoting a bibliography from draft to verified is the moment a human takes
+    responsibility for its entries, so it is deliberately an explicit act that leaves a
+    reviewable diff in ``bibliography.lock`` rather than something a build step infers.
+    """
+    from paper_forge.bib_lock import format_status, load_bibliography_counts, verify_files
+    from paper_forge.citations import resolve_bibliography
+    from paper_forge.compiler import load_project_config
+
+    try:
+        config = load_project_config(args.config)
+        base_dir = Path(args.config).parent
+        template_path = base_dir / config["manuscript"]
+
+        if args.files:
+            bib_paths = [Path(f) for f in args.files]
+        else:
+            bib_paths, origin = resolve_bibliography(config, base_dir, template_path)
+            if not bib_paths:
+                print(
+                    "ERROR: no bibliography configured — set 'citations.bibliography' in "
+                    "project.yaml or name the files to verify.",
+                    file=sys.stderr,
+                )
+                return 1
+            print(f"  Bibliography ({origin})")
+
+        missing = [p for p in bib_paths if not p.exists()]
+        if missing:
+            for path in missing:
+                print(f"ERROR: bibliography not found: {path}", file=sys.stderr)
+            return 1
+
+        statuses = verify_files(
+            bib_paths,
+            base_dir,
+            entry_counts=load_bibliography_counts(bib_paths),
+            note=args.note or "",
+        )
+        print(format_status(statuses))
+        print(f"\n  Recorded in {base_dir / 'bibliography.lock'} — commit it.")
+        return 0
+    except FileNotFoundError as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        return 1
+    except Exception as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        return 1
 
 
 def _cmd_tokens(args: argparse.Namespace) -> int:
@@ -605,6 +685,10 @@ def _cmd_check_refs(args: argparse.Namespace) -> int:
         print(f"ERROR: {e}", file=sys.stderr)
         return 1
 
+
+# Citation findings whose severity is governed by the bibliography trust tier rather than
+# by the `enforce`/--strict switch that governs fabrication findings.
+_TRUST_KINDS = frozenset({"modified-bibliography", "unverified-entry"})
 
 # Lifecycle findings where the registry contradicts the manuscript or itself: hard.
 # The evidence-vs-prominence prompts (headline-weak, buried-signal) and coverage gaps
@@ -911,6 +995,27 @@ def build_parser() -> argparse.ArgumentParser:
         help="Treat unresolvable citation keys as errors (non-zero exit).",
     )
 
+    # verify-bib
+    verify_bib_parser = subparsers.add_parser(
+        "verify-bib",
+        help="Record bibliography files as human-verified (writes bibliography.lock)",
+    )
+    verify_bib_parser.add_argument(
+        "files",
+        nargs="*",
+        help="Bibliography files to verify (default: the project's configured bibliography)",
+    )
+    verify_bib_parser.add_argument(
+        "--config",
+        default="project.yaml",
+        help="Path to project.yaml (default: project.yaml)",
+    )
+    verify_bib_parser.add_argument(
+        "--note",
+        default=None,
+        help="What you actually checked, recorded in the lock (e.g. 'DOIs spot-checked')",
+    )
+
     # tokens
     tokens_parser = subparsers.add_parser(
         "tokens",
@@ -999,6 +1104,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "check": _cmd_check,
         "check-refs": _cmd_check_refs,
         "tokens": _cmd_tokens,
+        "verify-bib": _cmd_verify_bib,
         "check-rqs": _cmd_check_rqs,
         "gate": _cmd_gate,
         "pdf": _cmd_pdf,

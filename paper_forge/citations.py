@@ -728,14 +728,73 @@ def find_prose_attributions(content: str, allow: list[str] | None = None) -> lis
 
 # Fabricated citations first: they are certain, and they are what misleads a reader.
 _FINDING_ORDER = {
+    "modified-bibliography": -1,
     "hallucinated-token": 0,
     "undefined-key": 1,
     "malformed-token": 2,
     "unkeyed-attribution": 3,
-    "duplicate-work": 4,
-    "duplicate-key": 5,
-    "unreadable-bibliography": 6,
+    "unverified-entry": 4,
+    "duplicate-work": 5,
+    "duplicate-key": 6,
+    "unreadable-bibliography": 7,
 }
+
+
+def _trust_findings(
+    bib_status: dict[str, str],
+    entries: dict[str, BibEntry],
+    citations: list[Citation],
+    token_map: dict[str, str],
+) -> list[CitationFinding]:
+    """Report bibliographies that changed after verification, and citations into drafts.
+
+    Reported per *file* rather than per citation: twelve citations into one unverified
+    bibliography are one decision for the human to make, not twelve findings to read.
+    """
+    findings: list[CitationFinding] = []
+
+    for source, state in sorted(bib_status.items()):
+        if state == "modified":
+            findings.append(
+                CitationFinding(
+                    kind="modified-bibliography",
+                    message=(
+                        f"{Path(source).name} changed after it was verified. Re-check the "
+                        "entries and re-run `paper-forge verify-bib` to accept the change"
+                    ),
+                    source=source,
+                )
+            )
+
+    # Which keys does the manuscript actually cite, by key or by token?
+    cited: set[str] = set()
+    for citation in citations:
+        if citation.command == TOKEN_COMMAND:
+            if resolved := token_map.get(citation.key):
+                cited.add(resolved)
+        elif citation.command != MALFORMED_TOKEN_COMMAND and citation.key != "*":
+            cited.add(citation.key)
+
+    unverified: dict[str, list[str]] = {}
+    for key in sorted(cited):
+        entry = entries.get(key)
+        if entry and bib_status.get(entry.source) == "draft":
+            unverified.setdefault(entry.source, []).append(key)
+
+    for source, keys in sorted(unverified.items()):
+        shown = ", ".join(keys[:5]) + (f" (+{len(keys) - 5} more)" if len(keys) > 5 else "")
+        findings.append(
+            CitationFinding(
+                kind="unverified-entry",
+                message=(
+                    f"{len(keys)} citation(s) resolve to {Path(source).name}, which no human "
+                    f"has verified: {shown}. Check the entries, then run "
+                    "`paper-forge verify-bib`"
+                ),
+                source=source,
+            )
+        )
+    return findings
 
 
 def _prose_attribution_findings(
@@ -787,6 +846,7 @@ def check_citations(
     bib_paths: list[Path] | list[str],
     allow: list[str] | None = None,
     flag_prose_attributions: bool = True,
+    bib_status: dict[str, str] | None = None,
 ) -> CitationReport:
     """Cross-check a manuscript's citations against its bibliography.
 
@@ -797,6 +857,10 @@ def check_citations(
         flag_prose_attributions: Report an author-year attribution typed as prose in a
             sentence that cites nothing (see :func:`find_prose_attributions`). Only ever
             applies when the bibliography has entries.
+        bib_status: Optional ``{bib_path: state}`` from :mod:`paper_forge.bib_lock`,
+            where state is ``verified``, ``draft`` or ``modified``. Supplying it turns on
+            the trust checks: citing an entry from an unverified bibliography is reported,
+            and a bibliography that changed after being verified is always an error.
 
     Returns:
         A :class:`CitationReport` carrying the parsed entries, every citation found,
@@ -865,6 +929,9 @@ def check_citations(
 
     if flag_prose_attributions and entries:
         findings.extend(_prose_attribution_findings(content, citations, entries, path, allow))
+
+    if bib_status:
+        findings.extend(_trust_findings(bib_status, entries, citations, token_map))
 
     findings.sort(key=lambda f: (_FINDING_ORDER.get(f.kind, 99), f.line, f.column))
     return CitationReport(

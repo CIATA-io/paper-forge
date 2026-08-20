@@ -22,6 +22,7 @@ paper-forge/
 │   ├── claims.py                 # Verdict-claim guard (hardcoded-verdict detector)
 │   ├── citations.py              # Citation guard (bibtex parser + cite-key resolution/coverage)
 │   ├── sentences.py              # Abbreviation-aware sentence segmentation (shared by guards)
+│   ├── bib_lock.py               # Bibliography trust ledger (draft/verified/modified)
 │   ├── research_questions.py     # RQ registry parser + check-rqs enforcement
 │   ├── interpretation.py         # Optional compile-time interpretation rules engine
 │   ├── provenance.py             # Git provenance & environment capture
@@ -72,11 +73,12 @@ paper-forge/
 
 | Module | Purpose |
 |--------|---------|
-| `cli.py` | argparse CLI: `init`, `compile`, `check`, `check-refs`, `tokens`, `check-rqs`, `gate`, `pdf` |
+| `cli.py` | argparse CLI: `init`, `compile`, `check`, `check-refs`, `tokens`, `verify-bib`, `check-rqs`, `gate`, `pdf` |
 | `compiler.py` | Loads `project.yaml`, reads JSONs, resolves `{{prefix.key:fmt}}` placeholders; strips `pf-allow-literal` directives from the output |
 | `formatters.py` | Formatting functions (`fmt_p()`, `fmt_r()`, `fmt_int()`, `fmt_pct0()`, …) and the `FORMATTERS` registry |
 | `literals.py` | Numeric-literal guard: flags hardcoded numbers in the template (`check --strict-literals`) |
 | `claims.py` | Verdict-claim guard: flags statistical verdicts asserted in prose instead of resolved via `{{interp.*}}` (`check --strict-claims`). Exempts a sentence citing a **resolvable** key when `bib_keys` is supplied, citation-shaped prose otherwise, and `pf-allow-claim` lines |
+| `bib_lock.py` | Bibliography trust ledger: `bibliography.lock` records which `.bib` files a human verified. Tokens prove a citation resolves to *an entry someone added*; this records who. `require_verified` is what stops an agent creating a draft `.bib` and citing it |
 | `sentences.py` | Abbreviation-aware sentence segmentation. Both guards need sentence granularity because manuscript markdown puts a paragraph on one line; kept separate so `claims.py` can depend on `citations.py` without a cycle |
 | `citations.py` | Citation guard: a dependency-free BibTeX parser plus LaTeX/pandoc cite extraction; `check_citations()` reports unresolvable keys, duplicate keys and bibliography coverage (`check-refs`). Exposes `BibEntry` so a DOI verifier can be layered on top |
 | `research_questions.py` | Parses the RQ registry; `check_research_questions()` powers `check-rqs` |

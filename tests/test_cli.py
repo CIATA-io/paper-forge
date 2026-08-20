@@ -301,3 +301,81 @@ def test_gate_fails_on_an_invented_token_and_keeps_it_visible(tmp_path: Path) ->
 def test_gate_fails_on_a_malformed_token(tmp_path: Path) -> None:
     _, cfg = _token_project(tmp_path, "Bees dance [ref:nothex].")
     assert main(["gate", "--config", cfg]) != 0
+
+
+# --- bibliography trust tiers -----------------------------------------------
+#
+# Create-only is not by itself a safeguard: an agent that wants a fabricated citation can
+# create a *new* draft file and cite that. What keeps a draft fabrication out of a
+# submission is `require_verified`, and what catches an edit to a signed-off file is the
+# digest. These pin the severity of each, because `gate` must not conflate them.
+
+
+def _tiered_project(tmp_path: Path, require_verified: bool) -> tuple[Path, str]:
+    project, cfg = _token_project(tmp_path, "PLACEHOLDER.")
+    token = _token_for(project, "lymburn2021")
+    template = project / "manuscript" / "manuscript_template.md"
+    template.write_text(
+        template.read_text(encoding="utf-8").replace("PLACEHOLDER.", f"Swarms compute {token}."),
+        encoding="utf-8",
+    )
+    if require_verified:
+        config = project / "project.yaml"
+        config.write_text(
+            config.read_text(encoding="utf-8").replace(
+                "  require_verified: false", "  require_verified: true"
+            ),
+            encoding="utf-8",
+        )
+    return project, cfg
+
+
+def test_draft_bibliography_passes_the_gate_by_default(tmp_path: Path) -> None:
+    """An unverified .bib is a normal working state, not a build break.
+
+    Failing here would break every existing project that has a .bib and no lock file the
+    moment this shipped, which is the fastest way to get a guard switched off.
+    """
+    _, cfg = _tiered_project(tmp_path, require_verified=False)
+    assert main(["gate", "--config", cfg]) == 0
+
+
+def test_draft_bibliography_fails_when_verification_is_required(tmp_path: Path) -> None:
+    _, cfg = _tiered_project(tmp_path, require_verified=True)
+    assert main(["gate", "--config", cfg]) != 0
+
+
+def test_verifying_the_bibliography_satisfies_the_requirement(tmp_path: Path) -> None:
+    project, cfg = _tiered_project(tmp_path, require_verified=True)
+    assert main(["verify-bib", "--config", cfg, "--note", "checked"]) == 0
+    assert (project / "bibliography.lock").exists()
+    assert main(["gate", "--config", cfg]) == 0
+
+
+def test_editing_a_verified_bibliography_always_fails(tmp_path: Path) -> None:
+    """Fatal even with require_verified off — a file a human signed off has changed."""
+    project, cfg = _tiered_project(tmp_path, require_verified=False)
+    assert main(["verify-bib", "--config", cfg]) == 0
+    assert main(["gate", "--config", cfg]) == 0
+
+    bib = project / "references.bib"
+    bib.write_text(
+        bib.read_text(encoding="utf-8") + "@article{ghost2024, title={Invented}, year=2024}\n",
+        encoding="utf-8",
+    )
+    assert main(["gate", "--config", cfg]) != 0
+
+    # Re-verifying is how a human accepts the change.
+    assert main(["verify-bib", "--config", cfg]) == 0
+    assert main(["gate", "--config", cfg]) == 0
+
+
+def test_fabrication_stays_fatal_regardless_of_tier(tmp_path: Path) -> None:
+    project, cfg = _tiered_project(tmp_path, require_verified=False)
+    assert main(["verify-bib", "--config", cfg]) == 0
+    template = project / "manuscript" / "manuscript_template.md"
+    template.write_text(
+        template.read_text(encoding="utf-8") + "\nInvented [ref:deadbeefcafe].\n",
+        encoding="utf-8",
+    )
+    assert main(["gate", "--config", cfg]) != 0
