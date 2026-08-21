@@ -98,7 +98,24 @@ paper-forge/
 project.yaml → prefix_map → {"01_name": "pf"}
                                        ↓
 template.md + results/*.json → compiler → manuscript.md → pandoc → manuscript.pdf
+                                       ↑
+references.bib ──── tokens ────────────┘   [ref:…] → \cite{key} / [@key]
 ```
+
+The compile path above is only half the system; the other half is what may enter it. Each
+guard owns one entry point, and `paper-forge gate` runs them in this order:
+
+```
+strict compile     compiler.py          every {{placeholder}} resolves
+numeric-literal    literals.py          scans the template
+verdict-claim      claims.py            scans the template (masks {{…}})
+frozen-verdict     unit_verdicts.py     AST-scans result-unit source
+citation           citations.py         template vs. bibliography (+ bib_lock.py tiers)
+research-question  research_questions.py  units vs. the RQ registry
+```
+
+The split matters: `claims.py` masks every `{{…}}` span, so a verdict routed through a result
+unit is invisible to it — which is why `unit_verdicts.py` reads the unit's source instead.
 
 ### Placeholder Resolution Algorithm
 

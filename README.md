@@ -39,19 +39,42 @@ directly to manuscript text:
 └──────────────────────────────────────────────────────────┘
 ```
 
-**You never type a number into your manuscript.** Instead, you write:
+**You never type a number into your manuscript — and never a verdict either.** You write:
 
 ```markdown
-We tested {{pop.n_total:int}} participants. The treatment group scored
-significantly higher (U = {{pop.u_stat:fmt1}}, p = {{pop.main_p:p}},
-r = {{pop.effect_size:r}}). {{pop.main_interp}}
+We tested {{pop.n_total:int}} participants. The treatment group
+{{interp.group_effect}} (U = {{pop.u_stat:fmt1}}, p = {{pop.main_p:p}},
+r = {{pop.effect_size:r}}).
 ```
 
 And paper-forge compiles it to:
 
 > We tested 87 participants. The treatment group scored significantly higher
-> (U = 1312.0, p = 0.002, r = +0.31). The difference was statistically
-> significant, providing clear evidence for a treatment effect.
+> (U = 1312.0, p = 0.002, r = +0.31).
+
+Note what is *not* in the template: the word "significantly". Typing it there would
+freeze the claim at whatever was true the day it was typed, while the p-value beside it
+kept updating. It comes from `{{interp.group_effect}}`, which is re-decided from the data
+on every compile — and the verdict-claim guard fails the build if you type it by hand.
+
+### What the gate checks
+
+`paper-forge gate` is the deterministic pass a manuscript must survive. No model runs; it is
+regex, AST and file digests:
+
+```
+strict compile      every {{placeholder}} resolves
+numeric-literal     no number typed into the template
+verdict-claim       no verdict typed into the template
+frozen-verdict      no verdict a result unit states instead of deriving
+citation            every cite key and [ref:…] token resolves to a real entry
+research-question   every result unit serves a declared question
+```
+
+The order is the order they run, and they compose: a number can only enter through code, a
+verdict only through a rule evaluated against those numbers, a citation only through the
+bibliography. Each guard closes one entry point, and the entry points are disjoint — which is
+why a claim that passes all six has nowhere left to have come from except the data.
 
 ---
 
