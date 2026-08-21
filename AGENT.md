@@ -15,7 +15,8 @@ placeholder-based templating.
 paper-forge/
 ├── paper_forge/                  # Core Python package
 │   ├── __init__.py
-│   ├── cli.py                    # argparse CLI (init/compile/check/check-refs/tokens/check-rqs/gate/pdf)
+│   ├── cli.py                    # argparse CLI (init/adopt/baseline/compile/check/…)
+│   ├── adopt.py                  # Adopting an existing manuscript + the number baseline
 │   ├── compiler.py               # project.yaml loader + placeholder compilation
 │   ├── formatters.py             # Number formatters (p, r, int, fmt2, pct, pct0, …)
 │   ├── literals.py               # Numeric-literal guard (hardcoded-number detector)
@@ -74,7 +75,8 @@ paper-forge/
 
 | Module | Purpose |
 |--------|---------|
-| `cli.py` | argparse CLI: `init`, `compile`, `check`, `check-refs`, `tokens`, `verify-bib`, `check-rqs`, `gate`, `pdf` |
+| `cli.py` | argparse CLI: `init`, `adopt`, `baseline`, `compile`, `check`, `check-refs`, `tokens`, `verify-bib`, `check-rqs`, `gate`, `pdf` |
+| `adopt.py` | Adoption for a paper that already exists: detects the manuscript, bibliography and analyses without touching them, renders a warnings-only `project.yaml`, and freezes a baseline. `compare_numbers()` checks a later compile against it — the one check that proves wiring slots did not change what the paper says |
 | `compiler.py` | Loads `project.yaml`, reads JSONs, resolves `{{prefix.key:fmt}}` placeholders; strips `pf-allow-literal` directives from the output |
 | `formatters.py` | Formatting functions (`fmt_p()`, `fmt_r()`, `fmt_int()`, `fmt_pct0()`, …) and the `FORMATTERS` registry |
 | `literals.py` | Numeric-literal guard: flags hardcoded numbers in the template (`check --strict-literals`) |
