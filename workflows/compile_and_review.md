@@ -57,6 +57,8 @@
    | `hallucinated-token` | Token in template matches no bibliography entry | Copy a valid token from `paper-forge tokens` |
    | `undefined-key` | Cite key in template not found in .bib | Add the entry to .bib, or correct the key |
    | `unkeyed-attribution` | Prose "(Author Year)" with no accompanying citation | Replace with `[@key]` or `[ref:…]` |
+   | `unverified-entry` | .bib not yet verified with `paper-forge verify-bib` | Run `verify-bib` after reviewing entries; warning by default, fatal when `require_verified: true` |
+   | `modified-bibliography` | A verified .bib changed since sign-off | Review the change, then re-run `paper-forge verify-bib`; always fatal |
 
 9. Verify no raw `{{...}}` placeholders remain in the compiled output:
    ```bash

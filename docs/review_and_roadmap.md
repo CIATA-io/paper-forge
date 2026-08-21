@@ -68,9 +68,18 @@ in the reservoir manuscript automatically.
 > and coverage. Reference tokens (`paper-forge tokens`) make an invented citation
 > structurally detectable without DOI verification: a token is a 12-hex-char digest
 > derived from the bibliography entry, so the guard can call a token that resolves to
-> nothing a **certain** fabrication rather than a heuristic. **Not yet shipped:** DOI /
-> Crossref verification of whether an entry describes a real paper (i.e., catching a
-> bibliographically complete but fictitious entry such as [6]).
+> nothing a **certain** fabrication rather than a heuristic. Also shipped: **bibliography
+> trust tiers** (`bib_lock.py`, `bibliography.lock`). A `.bib` is *draft* (not named in the
+> lock — citing it emits an `unverified-entry` finding), *verified* (a human ran
+> `paper-forge verify-bib`, which records the file's sha256, verifier email, and date), or
+> *modified* (a verified file whose digest no longer matches). `modified-bibliography` is
+> always fatal; `unverified-entry` is fatal only when `citations.require_verified: true` in
+> `project.yaml` (default: `false`, so an existing project with no lock file keeps passing
+> the gate). The sha256 digest catches an entry appended to a previously-approved file —
+> content comparison alone would not notice. Tokens transfer trust to the bibliography; tiers
+> record where that trust came from. **Not yet shipped:** DOI / Crossref verification of
+> whether an entry describes a real paper (i.e., catching a bibliographically complete but
+> fictitious entry such as [6]).
 
 **P2 — Harden `derived` eval.** `_resolve_derived` uses `eval` with a builtin allowlist
 (compiler.py:257). Move to `simpleeval` or an AST-restricted evaluator.

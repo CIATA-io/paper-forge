@@ -27,6 +27,11 @@ number→key→unit provenance map).
    as a confirmed error. For a **`citation`-kind finding**, verify the cited key or token
    actually resolves in the bibliography — a prose author-year attribution that matches no
    bibliography entry is itself a finding, not an exemption for the claim it accompanies.
+   Also check the bibliography trust tier: if `check-refs` reports `unverified-entry`
+   findings, the cited entry exists in the bibliography but the file has not been
+   human-verified — that is a reportable state (note the finding; severity depends on the
+   project's `require_verified` setting). A `modified-bibliography` finding means the gate
+   already failed before you were invoked; flag it and stop reviewing if it is present.
 4. Suggestions must respect the paper-forge invariant: numbers change only by editing a
    **result unit** (code), never by typing a number into prose. Frame fixes as edits to the
    template or a unit, or as prose/argument changes — never "change 2.67 to X" in the prose.

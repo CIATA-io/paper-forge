@@ -96,7 +96,7 @@ If a claim needs a source you do not have, leave a marker and ask:
 Sleep loss degrades waggle precision. <!-- TODO(cite): need a source -->
 ```
 
-This matters twice over, because the verdict guard exempts sentences that cite published
+This matters twice over, because the verdict-claim guard exempts sentences that cite published
 work — a claim about someone else's result is static by nature. That exemption now requires
 a key that **resolves**, so an invented citation no longer buys it: the reference is
 reported as missing *and* the verdict attached to it still gets flagged.
@@ -238,6 +238,7 @@ make compile     # Fill placeholders → manuscript.md
 make check       # Validate placeholders, literals, verdicts, citations
 make check-refs  # Cross-check citations against bibliography; report coverage
 make tokens      # Print the reference-token table (copy tokens from here)
+make verify-bib  # Record a .bib as human-verified (writes bibliography.lock)
 make pdf         # Render manuscript.md → manuscript.pdf
 make all         # compile + pdf
 make pipeline    # units + compile + pdf
@@ -281,8 +282,16 @@ Makefile                         # Build automation
    in a result unit; that decision belongs in `interpretations.yaml`.
 7. **Never invent a cite key or a reference token.** Cite only keys that exist in the
    project's `.bib`, or tokens copied verbatim from `paper-forge tokens`.
-8. **Always run `make check`** after modifying the template to catch missing placeholders,
-   hardcoded numbers, unbacked verdicts, and citations that resolve to nothing.
-9. **Always run `make compile`** after modifying result units to update the manuscript.
-10. **Test result units** with `make test` before compiling.
-11. **One JSON per result unit** — keep analyses modular and focused.
+8. **You may create a new .bib file** as a draft (e.g., from a deep-research pass).
+   Expect `make check-refs` to report every citation into it as `unverified-entry` — that
+   is normal working state. A human clears the finding by running `make verify-bib`.
+9. **Never edit a verified .bib.** `bibliography.lock` records the digest of each
+   human-verified file. Appending even one entry changes the digest and produces a
+   `modified-bibliography` finding that fails `gate` unconditionally, in every mode. If you
+   need to add an entry, create a separate new draft file and cite from there; ask the
+   human to merge and re-verify.
+10. **Always run `make check`** after modifying the template to catch missing placeholders,
+    hardcoded numbers, unbacked verdicts, and citations that resolve to nothing.
+11. **Always run `make compile`** after modifying result units to update the manuscript.
+12. **Test result units** with `make test` before compiling.
+13. **One JSON per result unit** — keep analyses modular and focused.

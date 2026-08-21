@@ -114,7 +114,10 @@
     The citation guard also runs here. A `hallucinated-token` finding means a token
     in the template resolves to nothing — obtain a valid token from `paper-forge tokens`.
     An `undefined-key` finding means a cite key is absent from the .bib file. Neither
-    finding should be suppressed.
+    finding should be suppressed. A `modified-bibliography` finding means a previously
+    verified .bib changed since sign-off — always fatal; review the change and re-run
+    `paper-forge verify-bib`. An `unverified-entry` finding means the cited .bib was
+    never verified; it is a warning by default and fatal when `require_verified: true`.
 
 ## Phase 5: Diff Against Previous Version
 

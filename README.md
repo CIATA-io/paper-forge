@@ -392,7 +392,7 @@ citations:
   allow: []                      # regexes for '@'-shaped text that is not a citation
 ```
 
-### Why this also fixes the verdict guard
+### Why this also fixes the verdict-claim guard
 
 The verdict-claim guard exempts sentences that cite published work — a claim about someone
 else's result is static and shouldn't be forced through `{{interp.*}}`. That exemption used

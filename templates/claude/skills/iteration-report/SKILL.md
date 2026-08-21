@@ -30,15 +30,18 @@ report every one that fires, not just the first.
 
 | # | Condition | Source |
 |---|---|---|
-| H1 | `gate` reports **claim-guard FAIL** — a hardcoded verdict in the template | `[gate]` |
+| H1 | `gate` reports **verdict-claim-guard FAIL** — a hardcoded verdict in the template | `[gate]` |
 | H2 | `gate` reports **`intro-has-retired`** or **`dropped-in-manuscript`** (by name, whatever severity label gate prints) | `[gate]` |
 | H3 | `rq_delta.py` classifies any evidence key **HALT** (headline effect: sign flip, emergence from zero, or ≥25% magnitude shift; headline p-value: crossed alpha) | `[rq_delta]` |
 | H4 | A **verdict-word change on a headline/reported RQ** in the compiled manuscript, or **any verdict-word change in the Abstract** | `[git]` |
+| H5 | `gate` citation-guard reports **`modified-bibliography`** — a verified bibliography's digest no longer matches: something changed a file a human signed off | `[gate]` |
 
 **Why H1 halts (not a mere fix):** a hardcoded verdict compiles to the *same string every
 iteration*, so H4's diff scan can never see it — it could contradict the data forever while
 the loop reports "no change". The template must be corrected and recompiled before any halt
 condition can be trusted again.
+
+**Why H5 halts (not a decision):** a `modified-bibliography` finding means the chain of custody for a bibliography a human explicitly signed off is broken. Every citation from that file is now effectively unverified, and some of those citations may support headline claims. The gate enforces this unconditionally — unlike `unverified-entry` which is governed by `require_verified` — so the loop must stop until a human re-runs `paper-forge verify-bib` and either accepts or investigates the change.
 
 **Why H4 covers the Abstract specially:** the Abstract is the highest-visibility claim in the
 paper and often carries verdicts far from any `<!-- rq:ID -->` anchor. A verdict flip there is
@@ -47,7 +50,7 @@ anchored or not.
 
 ## What is a decision (needs the human, does not halt)
 
-- `gate` FAIL on **strict-compile**, **literal-guard**, or **citation-guard** — must fix, but no conclusion moved.
+- `gate` FAIL on **strict-compile**, **literal-guard**, or **citation-guard** (other than `modified-bibliography`, which is H5 — a HALT) — must fix, but no conclusion moved.
 - `check-rqs` **headline-weak** (a headlined RQ on weak/negligible evidence — the framing call),
   **buried-signal**, or **headline-absent** (which also blinds H4 for that RQ — see Notes).
 - `rq_delta.py` **DECISION** rows (reported-RQ movements; new headline evidence keys with no
@@ -58,7 +61,9 @@ anchored or not.
 
 Advisories on `future_work`/`reported` RQs that meet no decision rule; p-value moves that
 stayed the same side of alpha; sub-threshold effect changes; verdict-word changes not
-attributable to any RQ anchor.
+attributable to any RQ anchor; `unverified-entry` advisories from the citation guard when
+`require_verified` is false (draft bibliography in use — normal during iteration; must be
+resolved before submission).
 
 ## Steps
 
@@ -71,9 +76,12 @@ attributable to any RQ anchor.
 2. **Gather deterministic facts** (do not paraphrase — capture verbatim, tagged):
    - `paper-forge gate` → `[gate]`. For H2, scan findings for the literal strings
      `intro-has-retired` / `dropped-in-manuscript` by **name**, regardless of the severity word
-     gate prints. Record each of the four checks' PASS/FAIL and the `check-rqs` per-RQ findings
-     (ADVISORY/ERROR) separately — gate speaks PASS/FAIL, check-rqs speaks ADVISORY/ERROR; keep
-     the two vocabularies in their own columns.
+     gate prints. For H5, scan the citation-guard output for the literal string
+     `modified-bibliography` by **name** — it is always fatal. Record each of the four checks'
+     PASS/FAIL and the `check-rqs` per-RQ findings (ADVISORY/ERROR) separately — gate speaks
+     PASS/FAIL, check-rqs speaks ADVISORY/ERROR; keep the two vocabularies in their own columns.
+     If the citation guard reports `unverified-entry` findings but the gate does not fail on them
+     (i.e. `require_verified` is false), record them as notifications.
    - `python .claude/skills/iteration-report/rq_delta.py` → `[rq_delta]`. This is the sole
      source for H3. Exit 2 = a halt-class row exists; exit 1 = it could not certify (missing
      baseline) → that is a DECISION, never treat it as "no change".
@@ -120,12 +128,12 @@ DQ-D1 [RQ1] headlined on a negligible effect (p=.031, |r|=.03) — headline or d
   verdicts flipped: 0 · headline evidence moved: 0 · gate: 4/4 (2 advisory)   ← all tool-derived
 
 ### Gate                                  ← one row per check; two vocab columns
-  check            PASS/FAIL   check-rqs signal
-  strict-compile   PASS        —
-  literal-guard    PASS        —
-  claim-guard      PASS        —
-  citation-guard   PASS        —
-  check-rqs        PASS        ADVISORY headline-weak(RQ1), headline-absent(RQ3,RQ5)
+  check                PASS/FAIL   check-rqs signal
+  strict-compile       PASS        —
+  literal-guard        PASS        —
+  verdict-claim-guard  PASS        —
+  citation-guard       PASS        —
+  check-rqs            PASS        ADVISORY headline-weak(RQ1), headline-absent(RQ3,RQ5)
 
 ### RQ delta                              ← only RQs that moved; verbatim from [rq_delta]
 

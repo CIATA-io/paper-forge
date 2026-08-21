@@ -25,8 +25,12 @@ units** (code). Every candidate must pass the paper-forge gate before it's score
 So numbers can change only by editing a unit that recomputes from data; a literal typed into
 prose is rejected; an invented citation is caught at the gate; a "wrong number" claim from the
 reviewer is auto-verified against the result JSON. The LLM revises argument and analysis; it
-cannot invent results or fabricate references — and none of that safety depends on an external
-service.
+cannot invent results; and the citation guard catches token-level fabrications (hallucinated
+or undefined tokens) unconditionally at the gate. An agent may *create* a draft bibliography
+for human review — that is the intended workflow — but with `citations.require_verified: true`
+the gate also blocks unverified entries from a finished paper, and a verified file whose digest
+has changed (`modified-bibliography`) is always fatal. None of that safety depends on an
+external service.
 
 ## New deterministic paper-forge pieces (Python, no LLM)
 

@@ -44,9 +44,10 @@ result-unit key it came from. Reward honest disclosure of limitations; penalise 
   never by typing a number into prose. Frame every fix as an edit to the template or a unit, or
   as a prose/argument change — never "change 2.67 to X" in the prose.
 - A **`citation`-kind finding** covers unresolvable cite keys, prose author-year attributions
-  that match no bibliography entry, and reference tokens that resolve to nothing. Run
-  `paper-forge check-refs` for the authoritative list; do not assert a citation error without
-  checking the bibliography first.
+  that match no bibliography entry, reference tokens that resolve to nothing, and
+  `unverified-entry` citations (a key that resolves in the bibliography but whose file has not
+  been human-verified). Run `paper-forge check-refs` for the authoritative list; do not assert
+  a citation error without checking the bibliography first.
 
 ## Known recurring concerns (optional — check whether each is addressed)
 

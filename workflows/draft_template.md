@@ -226,7 +226,8 @@ Five deterministic checks, all must pass:
 2. **numeric-literal guard** — no hardcoded numbers
 3. **verdict-claim guard** — no hardcoded verdicts
 4. **citation guard** — every cite key and `[ref:…]` token resolves; no attribution
-   written as bare prose
+   written as bare prose; a draft bibliography produces `unverified-entry` (warning
+   by default; fatal when `require_verified: true`)
 5. **research-question check** — every unit serves a declared RQ
 
 For findings that are genuinely static, annotate deliberately — never to silence a real

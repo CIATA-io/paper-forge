@@ -12,9 +12,12 @@ service. This is milestone M0 of the review loop; M2+ add the editor and the kee
 
 ## Steps
 
-1. **Gate first.** Run `paper-forge gate` (strict compile + numeric-literal guard + verdict guard + citation guard + check-rqs).
-   If the manuscript doesn't compile cleanly or has hardcoded literals, stop and report that —
-   there's nothing stable to review.
+1. **Gate first.** Run `paper-forge gate` (strict compile + numeric-literal guard + verdict-claim guard + citation guard + check-rqs).
+   If the gate fails, stop and report the specific failure before proceeding — there is nothing
+   stable to review. In particular: a `modified-bibliography` finding in the citation-guard output
+   is always fatal (the digest of a human-verified bibliography no longer matches); a draft
+   bibliography with `unverified-entry` findings is reported but not fatal unless
+   `citations.require_verified: true` is set.
 
 2. **Gather context.** Identify the compiled manuscript (`project.yaml` → `manuscript.output_md`),
    the rubric (`manuscript/review/rubric.md`), and the result JSONs (`manuscript/results/*.json`).

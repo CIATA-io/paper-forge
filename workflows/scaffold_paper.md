@@ -61,6 +61,7 @@
      bibliography: "references.bib"
      enforce: false
      flag_prose_attributions: true
+     require_verified: false   # true = citing an unverified .bib fails the gate
    ```
 
 ## Phase 4: Create Result Unit Stubs
@@ -116,11 +117,24 @@
     git commit -m "Initial paper-forge scaffold"
     ```
 
+14. If the project includes a bibliography, review its entries. Once satisfied,
+    record the sign-off and commit the lock file:
+    ```bash
+    paper-forge verify-bib references.bib --note "entries reviewed at scaffold"
+    git add bibliography.lock
+    git commit -m "Record initial bibliography verification"
+    ```
+    Without this step the bibliography is in *draft* state — citing it is reported
+    as `unverified-entry` (a warning by default; fatal if `require_verified: true`
+    is set later). Commit `bibliography.lock` alongside the .bib so any subsequent
+    change is detected as `modified-bibliography`.
+
 ## Completion Checklist
 
 - [ ] `project.yaml` configured with correct prefix map
 - [ ] Result unit stubs created for all planned analyses
 - [ ] Template has section structure with placeholder comments
 - [ ] Bibliography configured in `project.yaml` and `paper-forge tokens` run to produce the token table (if using a .bib)
+- [ ] `bibliography.lock` committed after reviewing bibliography entries (`paper-forge verify-bib`; if using a .bib)
 - [ ] `make check` passes (or only reports expected TODOs)
 - [ ] Git repository initialized
