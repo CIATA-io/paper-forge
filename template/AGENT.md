@@ -59,12 +59,12 @@ check` warns on verdicts found in template prose; `paper-forge gate` fails on th
 paper-forge *also* lets a result unit emit the interpretation itself, and for a
 human writing the unit that is a fine choice — `if p < .05: interp = "..."` is
 re-decided from the data on every run (see the README). **In this project the rules
-engine is the rule for agent-authored units**, because nothing guards result-unit
-prose: the literal and verdict-claim guards scan only the template. An agent that
-reads `p = .003` and writes `interp = "The effect was significant."` has frozen a
-verdict in the one place no check looks, and it is indistinguishable from the branch
-version until the data moves. A YAML rule cannot be written that way — the branch
-*is* the rule.
+engine is the rule for agent-authored units**. An agent that reads `p = .003` and
+writes `interp = "The effect was significant."` has frozen a verdict that is
+indistinguishable from the branch version in the result JSON. The **frozen-verdict
+guard** catches exactly that — it reads the unit's source and flags a verdict string
+that is not inside a branch — but a YAML rule cannot be written that way at all: the
+branch *is* the rule, so the mistake becomes unavailable rather than merely caught.
 
 Built-in rule functions are `correlation_effect`, `correlation_qualifier`,
 `comparison` and `significance_stars`. For a verdict they cannot express — a
@@ -290,9 +290,9 @@ Makefile                         # Build automation
 6. **Result units you write emit numbers, not prose.** No "significant"/"not significant"
    strings in a result unit *you* author — put that decision in `interpretations.yaml`.
    paper-forge does allow a unit to *derive* the phrase by branching on the statistic, and a
-   human may write it that way (README option 1); the rule is stricter for you because nothing
-   guards result-unit prose, so a verdict you chose after reading the data would never be
-   checked by anything.
+   human may write it that way (README option 1); the rule is stricter for you because a
+   verdict you state outright is one you chose by reading the data. `make check` runs the
+   frozen-verdict guard over the units and `paper-forge gate` fails on it.
 7. **Never invent a cite key or a reference token.** Cite only keys that exist in the
    project's `.bib`, or tokens copied verbatim from `paper-forge tokens`.
 8. **You may create a new .bib file** as a draft (e.g., from a deep-research pass).

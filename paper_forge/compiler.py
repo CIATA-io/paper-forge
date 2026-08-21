@@ -107,9 +107,12 @@ def load_project_config(path: str | Path) -> dict[str, Any]:
         ru = config.pop("result_units")
         if "prefix_map" in ru:
             config["prefix_map"] = ru["prefix_map"]
+        config.setdefault("units_dir", ru.get("dir", "scripts/result_units"))
 
     if "rendering" in config and isinstance(config["rendering"], dict):
         config["render"] = config.pop("rendering")
+
+    config.setdefault("units_dir", "scripts/result_units")
 
     required = ["manuscript", "output", "results_dir"]
     missing = [k for k in required if k not in config]

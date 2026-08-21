@@ -69,6 +69,9 @@ claims:
   enforce: false # no hardcoded verdicts in the template
   allow: []
   extra_patterns: []
+unit_verdicts:
+  enforce: false # no verdict stated outright in a result unit
+  allow: []
 citations:
   # bibliography: "references.bib"   # else: rendering.bibliography, front-matter, *.bib
   enforce: false # every cite key must resolve to a bibliography entry
@@ -406,6 +409,39 @@ def _check_claims(config_path: str, strict_claims: bool) -> int:
     return 1 if enforce else 0
 
 
+def _check_unit_verdicts(config_path: str, strict_units: bool) -> int:
+    """Run the frozen-verdict guard over the result units. Returns an exit-code delta.
+
+    The verdict-claim guard scans the template, and the compiler masks every ``{{...}}``
+    span before it looks — so a verdict routed through a result unit has never been checked
+    by anything. This is the guard for that path.
+    """
+    from paper_forge.compiler import load_project_config
+    from paper_forge.unit_verdicts import check_unit_verdicts, format_findings
+
+    config = load_project_config(config_path)
+    base_dir = Path(config_path).parent
+    unit_cfg = config.get("unit_verdicts", {}) or {}
+    units_dir = base_dir / config.get("units_dir", "scripts/result_units")
+    findings = check_unit_verdicts(units_dir, allow=unit_cfg.get("allow", []))
+
+    if not findings:
+        print("  No frozen verdicts in the result units.")
+        return 0
+
+    enforce = strict_units or bool(unit_cfg.get("enforce", False))
+    label = "ERROR" if enforce else "WARNING"
+    print(
+        f"\n  {label}: {len(findings)} verdict(s) stated outright in a result unit — a verdict "
+        "must be derived from the statistic (branch on it, or use interpretations.yaml), or it "
+        "freezes at whatever was true when it was typed "
+        "(or mark the line with '# pf-allow-verdict: reason'):",
+        file=sys.stderr,
+    )
+    print(format_findings(findings), file=sys.stderr)
+    return 1 if enforce else 0
+
+
 def _check_refs(config_path: str, strict_refs: bool, bib_override: list[str] | None = None) -> int:
     """Run the citation guard against the project bibliography. Returns an exit-code delta.
 
@@ -542,6 +578,13 @@ def _cmd_check(args: argparse.Namespace) -> int:
             exit_code |= _check_refs(args.config, getattr(args, "strict_refs", False))
         except Exception as e:
             print(f"ERROR (citation check): {e}", file=sys.stderr)
+            return 1
+
+    if not getattr(args, "no_units", False):
+        try:
+            exit_code |= _check_unit_verdicts(args.config, getattr(args, "strict_units", False))
+        except Exception as e:
+            print(f"ERROR (unit verdict check): {e}", file=sys.stderr)
             return 1
 
     return exit_code
@@ -810,6 +853,13 @@ def _cmd_gate(args: argparse.Namespace) -> int:
         print(f"ERROR (claim check): {e}", file=sys.stderr)
         rc = 1
 
+    print("  [gate] frozen-verdict guard ...")
+    try:
+        rc |= _check_unit_verdicts(args.config, strict_units=True)
+    except Exception as e:
+        print(f"ERROR (unit verdict check): {e}", file=sys.stderr)
+        rc = 1
+
     # Citation guard — a no-op (and never a failure) when the project has no bibliography.
     print("  [gate] citation guard ...")
     try:
@@ -970,6 +1020,17 @@ def build_parser() -> argparse.ArgumentParser:
         "--no-refs",
         action="store_true",
         help="Skip the citation guard entirely.",
+    )
+    check_parser.add_argument(
+        "--strict-units",
+        action="store_true",
+        help="Treat verdicts stated outright in a result unit as errors (non-zero exit), "
+        "not just warnings. Also settable via 'unit_verdicts.enforce' in project.yaml.",
+    )
+    check_parser.add_argument(
+        "--no-units",
+        action="store_true",
+        help="Skip the frozen-verdict guard entirely.",
     )
 
     # check-refs

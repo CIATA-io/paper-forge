@@ -20,6 +20,7 @@ paper-forge/
 │   ├── formatters.py             # Number formatters (p, r, int, fmt2, pct, pct0, …)
 │   ├── literals.py               # Numeric-literal guard (hardcoded-number detector)
 │   ├── claims.py                 # Verdict-claim guard (hardcoded-verdict detector)
+│   ├── unit_verdicts.py          # Frozen-verdict guard (AST scan of result units)
 │   ├── citations.py              # Citation guard (bibtex parser + cite-key resolution/coverage)
 │   ├── sentences.py              # Abbreviation-aware sentence segmentation (shared by guards)
 │   ├── bib_lock.py               # Bibliography trust ledger (draft/verified/modified)
@@ -80,6 +81,7 @@ paper-forge/
 | `claims.py` | Verdict-claim guard: flags statistical verdicts asserted in prose instead of resolved via `{{interp.*}}` (`check --strict-claims`). Exempts a sentence citing a **resolvable** key when `bib_keys` is supplied, citation-shaped prose otherwise, and `pf-allow-claim` lines |
 | `bib_lock.py` | Bibliography trust ledger: `bibliography.lock` records which `.bib` files a human verified. Tokens prove a citation resolves to *an entry someone added*; this records who. `require_verified` is what stops an agent creating a draft `.bib` and citing it |
 | `sentences.py` | Abbreviation-aware sentence segmentation. Both guards need sentence granularity because manuscript markdown puts a paragraph on one line; kept separate so `claims.py` can depend on `citations.py` without a cycle |
+| `unit_verdicts.py` | Frozen-verdict guard: AST scan of result-unit source for a verdict string the unit states rather than derives. The claim guard scans the template and the compiler masks `{{…}}`, so this is the only check that sees a verdict routed through a unit. A string inside `if`/ternary/`match` is derived and allowed |
 | `citations.py` | Citation guard: a dependency-free BibTeX parser plus LaTeX/pandoc cite extraction; `check_citations()` reports unresolvable keys, duplicate keys and bibliography coverage (`check-refs`). Exposes `BibEntry` so a DOI verifier can be layered on top |
 | `research_questions.py` | Parses the RQ registry; `check_research_questions()` powers `check-rqs` |
 | `interpretation.py` | Optional `InterpretationEngine` — derives phrases from result values at compile time (enable via `interpretations:` in project.yaml). `load_function_plugin()` lets a project register its own verdict functions via `interpretation_functions:`; it must run before `load_rules()`, which rejects unknown function names |

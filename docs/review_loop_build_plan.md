@@ -11,7 +11,7 @@ Claude Code** — no external LLM API, no keys, no `auto_deep_research`/SDK call
 |---|---|---|
 | **Reviewer** — critique manuscript vs rubric → findings + score | Claude Code subagent | `Agent` / `Task` tool (or a `.claude/agents/*.md` type) |
 | **Editor** — propose minimal diffs to template/units for top findings | Claude Code subagent | `Agent` tool, `isolation: worktree` |
-| **Gate** — recompile + `gate` (literal + verdict + citation guards + RQ check) + consistency + tests | **paper-forge (Python)** | `Bash` — deterministic, no LLM |
+| **Gate** — recompile + `gate` (literal + verdict + frozen-verdict + citation guards + RQ check) + consistency + tests | **paper-forge (Python)** | `Bash` — deterministic, no LLM |
 | **Orchestration** — compile → review → edit → gate → keep/discard | Claude Code **skill** (or a `Workflow` when the user opts in) | the running agent |
 
 Nothing here calls an LLM API. The reviewer/editor are subagents in the same Claude Code
@@ -21,7 +21,8 @@ session (already authenticated, local). paper-forge gains only deterministic CLI
 
 The editor subagent may touch **only** the template (prose + placeholders) and **result
 units** (code). Every candidate must pass the paper-forge gate before it's scored:
-`compile → gate (literal + verdict + citation guards + check-rqs) → consistency-check → pytest`.
+`compile → gate (literal + verdict + frozen-verdict + citation guards + check-rqs) →
+consistency-check → pytest`.
 So numbers can change only by editing a unit that recomputes from data; a literal typed into
 prose is rejected; an invented citation is caught at the gate; a "wrong number" claim from the
 reviewer is auto-verified against the result JSON. The LLM revises argument and analysis; it

@@ -2,7 +2,7 @@
 # ============================================================
 # Usage:
 #   make compile    — compile manuscript (fill placeholders)
-#   make check      — run placeholder, literal, verdict, and citation guards
+#   make check      — run placeholder, literal, verdict, frozen-verdict and citation guards
 #   make check-refs — cross-check citations against bibliography
 #   make tokens     — print the reference-token table
 #   make verify-bib — record the bibliography as human-verified
@@ -30,7 +30,7 @@ units:
 compile:
 	$(PAPER_FORGE) compile
 
-# Validate placeholders, literals, verdicts, and citations
+# Validate placeholders, literals, verdicts, result-unit verdicts, and citations
 check:
 	$(PAPER_FORGE) check
 
@@ -81,7 +81,7 @@ help:
 	@echo "  make all       — compile + pdf (default)"
 	@echo "  make units     — run all result unit scripts"
 	@echo "  make compile   — fill placeholders in manuscript template"
-	@echo "  make check      — validate placeholders, literals, verdicts, citations"
+	@echo "  make check      — validate placeholders, literals, verdicts, units, citations"
 	@echo "  make check-refs — cross-check citations against bibliography"
 	@echo "  make tokens     — print the reference-token table"
 	@echo "  make verify-bib — record the bibliography as human-verified"

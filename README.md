@@ -282,13 +282,14 @@ from result values at compile
 time, `paper_forge.interpretation` ships a small YAML-rule engine (`InterpretationEngine`);
 point `project.yaml` at an `interpretations:` file to enable it. Most projects don't need it.
 
-> **Nothing guards a result unit.** The literal and verdict-claim guards scan the *template*
-> only. An interpretation string is safe when it is **derived** from the statistic — the branch
-> above is re-evaluated on every run — but a *constant* chosen after looking at the data is a
-> frozen verdict in the one place no check looks, and the two are indistinguishable until the
-> data moves. That is why the shipped agent instructions (`template/AGENT.md`) require the rules
-> engine for agent-authored units: a YAML rule cannot be written unconditionally, because the
-> branch *is* the rule.
+> **Derive the string; never state it.** The literal and verdict-claim guards scan the
+> *template* only, so an interpretation string is safe when it is **derived** from the
+> statistic — the branch above is re-evaluated on every run — while a *constant* chosen after
+> looking at the data is a verdict frozen when it was typed, and the two are indistinguishable
+> in the result JSON. The [frozen-verdict guard](#the-guard-for-the-other-half) enforces this
+> by reading the unit's source. The shipped agent instructions (`template/AGENT.md`) go further
+> and require the rules engine for agent-authored units, because a YAML rule cannot be written
+> unconditionally: the branch *is* the rule.
 
 ### Why interpretation lives with the analysis
 
@@ -302,13 +303,14 @@ point `project.yaml` at an `interpretations:` file to enable it. Most projects d
 ## Reproducibility Guardrails
 
 paper-forge doesn't just *let* you source every number from code — it **checks** that you did.
-Four guards run under `paper-forge check`: the **literal** guard (hardcoded numbers), the
+Five guards run under `paper-forge check`: the **literal** guard (hardcoded numbers), the
 **verdict** guard (statistical conclusions asserted as prose), the **citation** guard
 (cite keys that resolve to nothing, fabricated reference tokens, prose attributions),
-and the **placeholder** check (missing or unresolved `{{…}}` slots). The
+the **frozen-verdict** guard (a verdict a result unit states instead of deriving), and the
+**placeholder** check (missing or unresolved `{{…}}` slots). The
 [Citations](#citations) section covers the citation guard in detail.
 
-`paper-forge check` runs all four guards; each can be suppressed or promoted to an error individually:
+`paper-forge check` runs all five; each can be suppressed or promoted to an error individually:
 
 ```bash
 paper-forge check                    # all guards (findings are warnings)
@@ -316,6 +318,8 @@ paper-forge check --strict-literals  # hardcoded literals become errors (non-zer
 paper-forge check --no-literals      # skip the numeric-literal guard entirely
 paper-forge check --strict-refs      # unresolvable cite keys become errors
 paper-forge check --no-refs          # skip the citation guard entirely
+paper-forge check --strict-units     # verdicts stated in a result unit become errors
+paper-forge check --no-units         # skip the frozen-verdict guard entirely
 paper-forge check --strict-claims    # prose verdicts become errors
 paper-forge check --no-claims        # skip the verdict-claim guard entirely
 ```
@@ -339,6 +343,45 @@ literals:
 ```
 
 This is what turns *"numbers → prose, never the reverse"* from a guideline into a gate.
+
+### The guard for the other half
+
+The verdict-claim guard scans the **template**, and the compiler masks every `{{…}}` span
+before it looks. So a verdict routed *through* a result unit was invisible to it:
+
+```python
+results["main_interp"] = "The treatment significantly reduced the outcome."
+```
+```markdown
+{{ex.main_interp}}
+```
+
+Every guard passed and the sentence reached the PDF. What separates a sound interpretation
+string from a frozen one is not where it lives but whether it was **derived** — so the
+frozen-verdict guard reads the result unit's *source*, where that is still visible:
+
+```python
+if p < 0.05:                                          # ✅ re-decided on every run
+    interp = "The effect was significant."
+else:
+    interp = "No significant effect was observed."
+
+interp = "The effect was significant."                # ❌ frozen when it was typed
+```
+
+A verdict-bearing string is flagged unless it sits inside a conditional — `if`/`else`, a
+ternary, or `match`. Docstrings, `print()`, logging calls, `raise` and `assert` are not
+manuscript prose and are left alone. For a string that genuinely is not a claim:
+
+```python
+label = "not significant"  # pf-allow-verdict: axis label
+```
+
+```yaml
+unit_verdicts:
+  enforce: false   # true = a frozen verdict fails `check` (gate enforces regardless)
+  allow: []        # regexes for strings that are not claims
+```
 
 ---
 
@@ -665,7 +708,7 @@ The Makefile targets wrap the `paper-forge` CLI, which you can also call directl
 |---------|-------------|
 | `paper-forge init [dir]` | Scaffold a new project |
 | `paper-forge compile [--strict]` | Fill placeholders → compiled markdown |
-| `paper-forge check [--strict-literals] [--strict-claims] [--strict-refs]` | Validate placeholders + the literal, verdict and citation guards |
+| `paper-forge check [--strict-literals] [--strict-claims] [--strict-refs] [--strict-units]` | Validate placeholders + the literal, verdict, citation and frozen-verdict guards |
 | `paper-forge check-refs [--strict] [--bib PATH]` | Cross-check citations against the bibliography, report coverage |
 | `paper-forge tokens [--format table\|json]` | Print the reference token for each bibliography entry |
 | `paper-forge verify-bib [FILE...] [--note TEXT]` | Record bibliography files as human-verified |

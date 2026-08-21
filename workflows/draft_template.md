@@ -91,8 +91,9 @@ Map each unit to its placeholder prefix from `project.yaml`:
 This ordering is the point. You cannot write "dance significantly predicts sleep" if the only
 way *you* may say it is `{{interp.dance_sleep}}` and that rule does not exist yet. paper-forge
 also lets a result unit emit the phrase itself (README option 1), but that route is closed to
-you here: nothing guards result-unit prose, so a verdict you wrote after reading the data would
-sit where no check looks. Declaring the rule first is what stops the data choosing your wording.
+you here: a verdict you wrote after reading the data is one the data chose for you. The
+frozen-verdict guard will catch a verdict string that is not inside a branch, but declaring the
+rule first is what stops the data choosing your wording in the first place.
 
 For every verdict the paper needs, add a rule to `interpretations.yaml`:
 
@@ -223,15 +224,16 @@ restating *whether* the effect holds is not.
 paper-forge gate
 ```
 
-Five deterministic checks, all must pass:
+Six deterministic checks, all must pass:
 
 1. **strict compile** — every placeholder resolves
 2. **numeric-literal guard** — no hardcoded numbers
-3. **verdict-claim guard** — no hardcoded verdicts
-4. **citation guard** — every cite key and `[ref:…]` token resolves; no attribution
+3. **verdict-claim guard** — no hardcoded verdicts in the template
+4. **frozen-verdict guard** — no verdict a result unit states instead of deriving
+5. **citation guard** — every cite key and `[ref:…]` token resolves; no attribution
    written as bare prose; a draft bibliography produces `unverified-entry` (warning
    by default; fatal when `require_verified: true`)
-5. **research-question check** — every unit serves a declared RQ
+6. **research-question check** — every unit serves a declared RQ
 
 For findings that are genuinely static, annotate deliberately — never to silence a real
 verdict:
@@ -273,7 +275,7 @@ them, and add the pattern to `claims.extra_patterns` so it is caught next time.
 - [ ] Every claim traces to exactly one RQ
 - [ ] Every verdict resolves through `{{interp.*}}` — including abstract, captions, title
 - [ ] Every number resolves through `{{prefix.key:formatter}}`
-- [ ] No result unit emits a verdict string — rules engine only, since nothing guards unit prose
+- [ ] No result unit states a verdict — rules engine only (frozen-verdict guard checks this)
 - [ ] `paper-forge gate` passes
 - [ ] Verdict-flip test done: all branches read as grammatical English
 - [ ] Compiled manuscript reads as prose, not as a form with numbers slotted in

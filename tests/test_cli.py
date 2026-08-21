@@ -379,3 +379,93 @@ def test_fabrication_stays_fatal_regardless_of_tier(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     assert main(["gate", "--config", cfg]) != 0
+
+
+# --- frozen-verdict guard, end to end ---------------------------------------
+
+_FROZEN_UNIT = """\
+from pathlib import Path
+from paper_forge.result_unit import save_results
+
+RESULTS_DIR = Path(__file__).resolve().parents[2] / "manuscript" / "results"
+
+
+def main() -> None:
+    save_results("01_example", {
+        "n_samples": 150, "p_value": 0.003, "effect": -0.42,
+        "main_interp": "The treatment significantly reduced the outcome.",
+    }, output_dir=RESULTS_DIR)
+
+
+main()
+"""
+
+_DERIVED_UNIT = """\
+from pathlib import Path
+from paper_forge.result_unit import save_results
+
+RESULTS_DIR = Path(__file__).resolve().parents[2] / "manuscript" / "results"
+
+
+def main() -> None:
+    p_value = 0.003
+    if p_value < 0.05:
+        main_interp = "The treatment significantly reduced the outcome."
+    else:
+        main_interp = "The treatment did not measurably change the outcome."
+    save_results("01_example", {
+        "n_samples": 150, "p_value": p_value, "effect": -0.42,
+        "main_interp": main_interp,
+    }, output_dir=RESULTS_DIR)
+
+
+main()
+"""
+
+
+def _interp_project(tmp_path: Path, unit_source: str) -> tuple[Path, str]:
+    """Scaffold a project whose template renders the unit's interpretation string."""
+    project = tmp_path / "paper"
+    assert main(["init", str(project)]) == 0
+    (project / "scripts" / "result_units" / "01_example.py").write_text(
+        unit_source, encoding="utf-8"
+    )
+    assert _run_scaffolded_unit(project).returncode == 0
+
+    template = project / "manuscript" / "manuscript_template.md"
+    template.write_text(
+        template.read_text(encoding="utf-8").replace(
+            "The treatment {{interp.main_effect}} the outcome\n"
+            "(r = {{ex.effect:r}}, p = {{ex.p_value:p}}, {{ex.p_value:stars}}).",
+            "{{ex.main_interp}} (r = {{ex.effect:r}}, p = {{ex.p_value:p}}).",
+        ),
+        encoding="utf-8",
+    )
+    return project, str(project / "project.yaml")
+
+
+def test_gate_fails_on_a_verdict_frozen_into_a_result_unit(tmp_path: Path) -> None:
+    """The path that every other guard misses.
+
+    The verdict-claim guard scans the template and masks every {{...}} span, so a verdict
+    routed through a result unit reaches the PDF with the whole gate green.
+    """
+    project, cfg = _interp_project(tmp_path, _FROZEN_UNIT)
+    assert main(["gate", "--config", cfg]) != 0
+
+    # The frozen verdict really does reach the compiled manuscript — that is the point.
+    assert main(["compile", "--config", cfg]) == 0
+    compiled = (project / "manuscript" / "manuscript.md").read_text(encoding="utf-8")
+    assert "significantly reduced the outcome" in compiled
+
+
+def test_gate_passes_when_the_verdict_is_derived(tmp_path: Path) -> None:
+    _, cfg = _interp_project(tmp_path, _DERIVED_UNIT)
+    assert main(["gate", "--config", cfg]) == 0
+
+
+def test_check_warns_by_default_and_fails_with_strict_units(tmp_path: Path) -> None:
+    _, cfg = _interp_project(tmp_path, _FROZEN_UNIT)
+    assert main(["check", "--config", cfg]) == 0
+    assert main(["check", "--config", cfg, "--strict-units"]) != 0
+    assert main(["check", "--config", cfg, "--strict-units", "--no-units"]) == 0

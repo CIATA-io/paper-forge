@@ -32,6 +32,13 @@ claims:
   allow: [] # regexes for claims that are genuinely static
   extra_patterns: [] # project-specific verdict vocabulary to also catch
 
+# Guard: no verdict stated outright in a result unit. A verdict must be *derived* from
+# the statistic (branch on it), or it freezes at whatever was true when it was typed —
+# and nothing else scans result units.
+unit_verdicts:
+  enforce: false # `paper-forge gate` enforces regardless
+  allow: [] # regexes for strings that are not claims (axis labels, categories)
+
 # Guard: every citation resolves to a real entry in the bibliography.
 citations:
   # Bibliography used to resolve cite keys. Falls back to rendering.bibliography,
