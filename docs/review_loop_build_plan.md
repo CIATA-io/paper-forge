@@ -93,10 +93,13 @@ prose) and **data-analyst** (analysis → result units, gate-verified). The anal
 one — reviewers ask for endless analysis, and doing all of it balloons the paper and opens new
 attack surface. It is scope-limited **by construction**, not by intent:
 
-1. **Triage every analysis ask into fix / strengthen / expand, default-deny on expand.**
-   *fix* = correct a computation the paper already reports (auto). *strengthen* = add rigor
-   (CI/test/sensitivity) to an existing claim over the same data+features (human-approve).
-   *expand* = new data/colonies/features/models (propose only — a rebuttal note; nothing runs).
+1. **Triage every analysis ask into fix / strengthen / deepen / focus / expand, default-deny
+   on expand.** *fix* = correct a computation the paper already reports (auto). *strengthen* =
+   add rigor (CI/test/sensitivity) to an existing claim over the same data+features
+   (human-approve). *deepen* = an unknown the *existing* data can answer with no current RQ
+   (propose a `candidate` RQ for a human to admit). *focus* = a claim/RQ is weak or
+   under-supported (propose narrowing or dropping the RQ). *expand* = new
+   data/colonies/features/models (propose only — a rebuttal note; nothing runs).
 2. **Analysis charter** (`manuscript/review/charter.md`) declares in-scope data/features/models;
    the analyst may operate only inside it. Amending it is a deliberate human act — that's the
    valve that lets the analysis grow.

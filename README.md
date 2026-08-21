@@ -253,7 +253,8 @@ a sign in your template text:
 Statistical interpretation ("the effect was significant") is a research decision, so
 paper-forge keeps it next to the analysis. Two options:
 
-**1. Interpretation as data (recommended).** A result unit emits the interpretation as a
+**1. Interpretation as data (recommended when a human writes the unit).** A result unit
+emits the interpretation as a
 plain string in its JSON, and the template inserts it with `{{prefix.key}}`:
 
 ```python
@@ -276,9 +277,18 @@ results["main_interp"] = main_interp
 > qualitative and show the value once via a placeholder:
 > `{{ex.main_interp}} (p = {{ex.main_p:p}})`.
 
-**2. Optional rules engine.** For canned phrasings derived from result values at compile
+**2. Rules engine (use this when an agent writes the unit).** For canned phrasings derived
+from result values at compile
 time, `paper_forge.interpretation` ships a small YAML-rule engine (`InterpretationEngine`);
 point `project.yaml` at an `interpretations:` file to enable it. Most projects don't need it.
+
+> **Nothing guards a result unit.** The literal and verdict-claim guards scan the *template*
+> only. An interpretation string is safe when it is **derived** from the statistic — the branch
+> above is re-evaluated on every run — but a *constant* chosen after looking at the data is a
+> frozen verdict in the one place no check looks, and the two are indistinguishable until the
+> data moves. That is why the shipped agent instructions (`template/AGENT.md`) require the rules
+> engine for agent-authored units: a YAML rule cannot be written unconditionally, because the
+> branch *is* the rule.
 
 ### Why interpretation lives with the analysis
 
@@ -616,7 +626,7 @@ within the research-question registry and the analysis charter (`manuscript/revi
 | Tier | What it is | Default action |
 |------|------------|----------------|
 | **fix** | correct a computation the paper already reports | auto: run the analyst |
-| **strengthen** | add rigor (CI/test/sensitivity) to an existing claim | ask first, then run |
+| **strengthen** | add rigor (CI/test/sensitivity) to an existing claim, over the same data and features | ask first, then run |
 | **deepen** | an unknown the *existing data* can answer, no current RQ | propose a `candidate` RQ for a human to admit |
 | **focus** | a claim/RQ is weak or under-supported | propose narrowing/dropping the RQ |
 | **expand** | needs *new data* / features / models | propose a rebuttal note only — nothing runs |
