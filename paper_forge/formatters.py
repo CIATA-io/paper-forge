@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Callable
+from dataclasses import dataclass
 
 # Unicode characters for formatting
 _SUPERSCRIPT_DIGITS = str.maketrans("0123456789-", "⁰¹²³⁴⁵⁶⁷⁸⁹⁻")
@@ -35,6 +36,67 @@ _UNICODE_MINUS = "\u2212"  # −
 # ---------------------------------------------------------------------------
 
 _RENDER_MODE: str = "unicode"  # "unicode" or "latex"
+
+
+@dataclass(frozen=True)
+class FormatterConfig:
+    """A project's numeric house style.
+
+    A paper already has conventions for how it prints numbers, and a migration must not
+    change them: wiring a number should change *where it comes from*, never *what it
+    says*. These are the knobs where paper-forge's defaults are not universal.
+
+    Every default reproduces the historical output exactly, so a project without a
+    ``formatting:`` section is byte-for-byte unaffected.
+
+    Attributes:
+        r_decimals: Decimal places for ``:r``. Two is enough for most papers; a paper
+            whose argument turns on small effects needs three — at two decimals
+            r = 0.029 and r = 0.035 both print "+0.03", erasing the distinction.
+        p_small_sig_figs: Significant figures for p in [0.001, 0.01). ``None`` keeps the
+            default 3-decimal path. Expressed as significant figures rather than decimals
+            because decimals fail in this band: 3 gives "0.006" for 0.0062 (one sig fig)
+            and "0.01" for 0.0096, which rounds out of the band and reads as p ≥ 0.01.
+        p_clamp_exp: Print ``< 10⁻ᴺ`` for p below ``10**-N`` instead of a mantissa whose
+            digits are below the float64 denormal floor and carry no information.
+            ``None`` disables clamping.
+    """
+
+    r_decimals: int = 2
+    p_small_sig_figs: int | None = None
+    p_clamp_exp: int | None = None
+
+
+_FMT_CONFIG: FormatterConfig = FormatterConfig()
+
+
+def set_formatter_config(config: FormatterConfig) -> None:
+    """Install the project's numeric house style.
+
+    Mirrors :func:`set_render_mode`: module-global state read by the formatters at call
+    time, set once per compile. Frozen config, so a caller holding a reference cannot
+    mutate it behind the setter's back.
+
+    Raises:
+        ValueError: If a knob is outside its sensible range. ``p_clamp_exp`` below 3 is
+            rejected because a threshold of 10⁻¹ or larger would clamp ordinary
+            p-values — including a typical alpha — into "< 10⁻¹".
+    """
+    if config.r_decimals < 0 or config.r_decimals > 10:
+        raise ValueError(f"r_decimals must be in [0, 10], got {config.r_decimals}")
+    if config.p_small_sig_figs is not None and not (1 <= config.p_small_sig_figs <= 10):
+        raise ValueError(
+            f"p_small_sig_figs must be in [1, 10], got {config.p_small_sig_figs}"
+        )
+    if config.p_clamp_exp is not None and not (3 <= config.p_clamp_exp <= 300):
+        raise ValueError(f"p_clamp_exp must be in [3, 300], got {config.p_clamp_exp}")
+    global _FMT_CONFIG
+    _FMT_CONFIG = config
+
+
+def get_formatter_config() -> FormatterConfig:
+    """The numeric house style currently in force."""
+    return _FMT_CONFIG
 
 
 def set_render_mode(mode: str) -> None:
@@ -103,8 +165,22 @@ def fmt_p(p: float | None) -> str:
     if p < 0:
         return "N/A"
     if p >= 0.001:
+        # In [0.001, 0.01) three decimals can cost a significant figure (0.0062 -> 0.006)
+        # or round out of the band (0.0096 -> 0.01, which reads as p >= 0.01), so a
+        # project may ask for significant figures here instead.
+        if _FMT_CONFIG.p_small_sig_figs is not None and p < 0.01:
+            return f"{p:.{_FMT_CONFIG.p_small_sig_figs}g}"
         # Use up to 3 significant figures, but strip trailing zeros
         return f"{p:.3f}".rstrip("0").rstrip(".")
+    # The clamp is checked before the p == 0 case on purpose: 0 is below any positive
+    # threshold, so a configured clamp should catch it rather than falling through to
+    # "< 0.001", which would understate a value stored as exactly zero.
+    clamp_exp = _FMT_CONFIG.p_clamp_exp
+    if clamp_exp is not None and p < 10.0**-clamp_exp:
+        if _RENDER_MODE == "latex":
+            return f"< 10^{{-{clamp_exp}}}"
+        return f"< 10{str(-clamp_exp).translate(_SUPERSCRIPT_DIGITS)}"
+    # Reached only when no clamp is configured; also guards log10(0) below.
     if p == 0:
         return "< 0.001"
     # Scientific notation
@@ -181,7 +257,11 @@ def fmt_r(r: float | None, sign: bool = True) -> str:
     if _is_missing(r):
         return "N/A"
     r = float(r)
-    abs_val = f"{abs(r):.2f}"
+    decimals = _FMT_CONFIG.r_decimals
+    abs_val = f"{abs(r):.{decimals}f}"
+    # The zero case must honour the configured precision too, or a 3-decimal paper
+    # prints "0.00" for exactly zero and "0.029" everywhere else.
+    zero_val = f"{0.0:.{decimals}f}"
     if _RENDER_MODE == "latex":
         # Use ASCII minus, no $...$ — template controls math delimiters
         if not sign:
@@ -192,7 +272,7 @@ def fmt_r(r: float | None, sign: bool = True) -> str:
             return f"-{abs_val}"
         if r > 0:
             return f"+{abs_val}"
-        return "0.00"
+        return zero_val
     if not sign:
         if r < 0:
             return f"{_UNICODE_MINUS}{abs_val}"
@@ -201,7 +281,7 @@ def fmt_r(r: float | None, sign: bool = True) -> str:
         return f"{_UNICODE_MINUS}{abs_val}"
     if r > 0:
         return f"+{abs_val}"
-    return "0.00"
+    return zero_val
 
 
 def fmt_int(n: float | int | None) -> str:

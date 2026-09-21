@@ -39,7 +39,20 @@ from typing import Any
 
 import yaml
 
-from paper_forge.formatters import FORMATTERS, fmt_raw, set_render_mode
+from paper_forge.formatters import (
+    FORMATTERS,
+    FormatterConfig,
+    fmt_raw,
+    set_formatter_config,
+    set_render_mode,
+)
+
+
+def _optional_int(value: Any) -> int | None:
+    """Coerce a YAML scalar to int, treating an absent/null value as unset."""
+    if value is None or (isinstance(value, str) and value.strip().lower() in ("", "null")):
+        return None
+    return int(value)
 from paper_forge.interpretation import InterpretationEngine, load_function_plugin
 from paper_forge.result_unit import load_results
 
@@ -404,6 +417,17 @@ def compile_manuscript(
         set_render_mode("latex")
     else:
         set_render_mode("unicode")
+
+    # The project's numeric house style, alongside the render mode. Absent section =
+    # defaults = historical output, so an existing project is unaffected.
+    fmt_section = config.get("formatting") or {}
+    set_formatter_config(
+        FormatterConfig(
+            r_decimals=int(fmt_section.get("r_decimals", 2)),
+            p_small_sig_figs=_optional_int(fmt_section.get("p_small_sig_figs")),
+            p_clamp_exp=_optional_int(fmt_section.get("p_clamp_exp")),
+        )
+    )
 
     # Load results
     results_dir = base_dir / config["results_dir"]

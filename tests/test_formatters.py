@@ -418,3 +418,161 @@ class TestRenderMode:
         p_val = fmt_p(3.8e-4)
         rendered = f"$p = {p_val}$"
         assert "$$" not in rendered  # No nested delimiters
+
+
+# --- per-project numeric house style ----------------------------------------
+#
+# Defaults must reproduce the historical output exactly; a project opts in via a
+# `formatting:` section. The cases below are the ones a migration actually turns on.
+
+import pytest  # noqa: E402
+
+from paper_forge.formatters import (  # noqa: E402
+    FormatterConfig,
+    set_formatter_config,
+    set_render_mode,
+)
+
+
+class TestFormatterConfigDefaults:
+    """With no configuration, nothing about the output changes."""
+
+    def test_r_defaults_to_two_decimals(self):
+        assert fmt_r(0.029) == "+0.03"
+
+    def test_p_small_band_default_loses_a_sig_fig(self):
+        # Documents the default behaviour the opt-in exists to change.
+        assert fmt_p(0.0062) == "0.006"
+
+    def test_p_small_band_default_rounds_out_of_band(self):
+        assert fmt_p(0.0096) == "0.01"
+
+    def test_p_zero_defaults_to_lt_0001(self):
+        assert fmt_p(0.0) == "< 0.001"
+
+
+class TestEffectSizePrecision:
+    def test_three_decimals_preserves_the_distinction(self):
+        # The paper's argument separates these two effects; at 2dp both are "+0.03".
+        set_formatter_config(FormatterConfig(r_decimals=3))
+        assert fmt_r(0.029) == "+0.029"
+        assert fmt_r(0.035) == "+0.035"
+
+    def test_three_decimals_does_not_cross_the_interpretation_threshold(self):
+        # At 2dp 0.096 renders "+0.10", reading as if it crossed the 0.1 branch point.
+        set_formatter_config(FormatterConfig(r_decimals=3))
+        assert fmt_r(0.096) == "+0.096"
+
+    def test_negative_keeps_unicode_minus(self):
+        set_formatter_config(FormatterConfig(r_decimals=3))
+        assert fmt_r(-0.520) == "−0.520"
+
+    def test_zero_honours_configured_precision(self):
+        set_formatter_config(FormatterConfig(r_decimals=3))
+        assert fmt_r(0.0) == "0.000"
+
+    def test_negative_zero_gets_no_sign(self):
+        # IEEE -0.0 < 0 is False, so no spurious minus.
+        set_formatter_config(FormatterConfig(r_decimals=3))
+        assert fmt_r(-0.0) == "0.000"
+
+    def test_missing_ignores_config(self):
+        set_formatter_config(FormatterConfig(r_decimals=3))
+        assert fmt_r(None) == "N/A"
+
+    def test_latex_mode_respects_precision(self):
+        set_formatter_config(FormatterConfig(r_decimals=3))
+        set_render_mode("latex")
+        assert fmt_r(-0.029) == "-0.029"
+
+    def test_f3_is_independent_of_r_decimals(self):
+        set_formatter_config(FormatterConfig(r_decimals=3))
+        assert FORMATTERS["f3"](0.029) == "0.029"
+
+
+class TestPValueSignificantFigures:
+    def test_keeps_two_sig_figs_in_the_small_band(self):
+        set_formatter_config(FormatterConfig(p_small_sig_figs=2))
+        assert fmt_p(0.0062) == "0.0062"
+
+    def test_does_not_round_out_of_the_band(self):
+        # The critical case: the default path renders this as "0.01".
+        set_formatter_config(FormatterConfig(p_small_sig_figs=2))
+        assert fmt_p(0.0096) == "0.0096"
+
+    def test_upper_edge_of_band(self):
+        set_formatter_config(FormatterConfig(p_small_sig_figs=2))
+        assert fmt_p(0.0099) == "0.0099"
+
+    def test_value_that_genuinely_rounds_to_the_boundary(self):
+        # 0.00999 at 2 sig figs really is 0.01; rounding is not avoidable.
+        set_formatter_config(FormatterConfig(p_small_sig_figs=2))
+        assert fmt_p(0.00999) == "0.01"
+
+    def test_not_applied_above_the_band(self):
+        set_formatter_config(FormatterConfig(p_small_sig_figs=2))
+        assert fmt_p(0.042) == "0.042"
+
+    def test_lower_edge_of_band(self):
+        set_formatter_config(FormatterConfig(p_small_sig_figs=2))
+        assert fmt_p(0.001) == "0.001"
+
+
+class TestPValueClamp:
+    def test_below_threshold_is_clamped(self):
+        set_formatter_config(FormatterConfig(p_clamp_exp=300))
+        assert fmt_p(1e-301) == "< 10⁻³⁰⁰"
+
+    def test_exactly_at_threshold_is_not_clamped(self):
+        # Strict less-than: 1e-300 still carries information.
+        set_formatter_config(FormatterConfig(p_clamp_exp=300))
+        assert fmt_p(1e-300) != "< 10⁻³⁰⁰"
+
+    def test_zero_is_clamped_when_a_clamp_is_configured(self):
+        # 0 is below any positive threshold; it must not fall through to "< 0.001".
+        set_formatter_config(FormatterConfig(p_clamp_exp=300))
+        assert fmt_p(0.0) == "< 10⁻³⁰⁰"
+
+    def test_latex_clamp(self):
+        set_formatter_config(FormatterConfig(p_clamp_exp=300))
+        set_render_mode("latex")
+        assert fmt_p(1e-301) == "< 10^{-300}"
+
+    def test_ordinary_small_p_still_scientific(self):
+        set_formatter_config(FormatterConfig(p_clamp_exp=300))
+        assert fmt_p(4.52e-17) == "4.5×10⁻¹⁷"
+
+
+class TestFormatterConfigValidation:
+    @pytest.mark.parametrize("bad", [0, 1, 2, 301])
+    def test_rejects_clamp_exponents_that_would_swallow_real_p_values(self, bad):
+        # p_clamp_exp=1 means a 0.1 threshold — it would clamp a typical alpha.
+        with pytest.raises(ValueError, match="p_clamp_exp"):
+            set_formatter_config(FormatterConfig(p_clamp_exp=bad))
+
+    def test_rejects_absurd_r_decimals(self):
+        with pytest.raises(ValueError, match="r_decimals"):
+            set_formatter_config(FormatterConfig(r_decimals=-1))
+
+    def test_rejects_absurd_sig_figs(self):
+        with pytest.raises(ValueError, match="p_small_sig_figs"):
+            set_formatter_config(FormatterConfig(p_small_sig_figs=0))
+
+    def test_config_is_frozen(self):
+        # A held reference must not be mutable behind the setter's back.
+        from dataclasses import FrozenInstanceError
+
+        cfg = FormatterConfig()
+        with pytest.raises(FrozenInstanceError):
+            cfg.r_decimals = 5
+
+
+class TestFormatterStateIsolation:
+    """The autouse fixture must reset the house style between tests."""
+
+    def test_a_sets_three_decimals(self):
+        set_formatter_config(FormatterConfig(r_decimals=3))
+        assert fmt_r(0.029) == "+0.029"
+
+    def test_b_sees_the_default_again(self):
+        assert fmt_r(0.029) == "+0.03"
