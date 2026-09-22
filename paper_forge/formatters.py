@@ -26,6 +26,7 @@ from __future__ import annotations
 import math
 from collections.abc import Callable
 from dataclasses import dataclass
+from decimal import ROUND_CEILING, ROUND_FLOOR, Decimal
 
 # Unicode characters for formatting
 _SUPERSCRIPT_DIGITS = str.maketrans("0123456789-", "⁰¹²³⁴⁵⁶⁷⁸⁹⁻")
@@ -85,7 +86,9 @@ def set_formatter_config(config: FormatterConfig) -> None:
     if config.r_decimals < 0 or config.r_decimals > 10:
         raise ValueError(f"r_decimals must be in [0, 10], got {config.r_decimals}")
     if config.p_small_sig_figs is not None and not (1 <= config.p_small_sig_figs <= 10):
-        raise ValueError(f"p_small_sig_figs must be in [1, 10], got {config.p_small_sig_figs}")
+        raise ValueError(
+            f"p_small_sig_figs must be in [1, 10], got {config.p_small_sig_figs}"
+        )
     if config.p_clamp_exp is not None and not (3 <= config.p_clamp_exp <= 300):
         raise ValueError(f"p_clamp_exp must be in [3, 300], got {config.p_clamp_exp}")
     global _FMT_CONFIG
@@ -452,6 +455,130 @@ def fmt_raw(x: object) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Bound-safe rounding
+# ---------------------------------------------------------------------------
+# Round-to-nearest is correct for reporting a value and wrong for reporting a
+# bound. "max |d| < 0.2" built from max_d = 0.234 is false, and so is
+# "all p > 0.35" built from a minimum of 0.3453 -- in both cases the value that
+# defines the bound violates it, because rounding moved toward the data. A
+# bound has to round away from the data: ceil for an upper bound, floor for a
+# lower one. Wiring the right key is not enough to make the sentence true.
+
+
+def _quantize(x: float | None, decimals: int, rounding: str) -> str:
+    """Round to a fixed number of decimals in one direction only.
+
+    Operates on the shortest decimal representation of the float (what ``repr``
+    shows), so a value already sitting on the target precision stays put:
+    ``0.23`` renders as ``0.23``, not ``0.24``, even though the stored double is
+    fractionally below 0.23.
+
+    Args:
+        x: The number to format.
+        decimals: Number of decimal places to keep.
+        rounding: ``ROUND_CEILING`` or ``ROUND_FLOOR``.
+
+    Returns:
+        Formatted string, or ``'N/A'`` when the value is missing.
+    """
+    if _is_missing(x):
+        return "N/A"
+    exponent = Decimal(1).scaleb(-decimals)
+    value = Decimal(str(float(x))).quantize(exponent, rounding=rounding)
+    return f"{value:.{decimals}f}"
+
+
+def fmt_f0_ceil(x: float | None) -> str:
+    """Round up to a whole number, for use as an upper bound.
+
+    Examples:
+        >>> fmt_f0_ceil(42.1)
+        '43'
+        >>> fmt_f0_ceil(42.0)
+        '42'
+    """
+    return _quantize(x, 0, ROUND_CEILING)
+
+
+def fmt_f1_ceil(x: float | None) -> str:
+    """Round up to 1 decimal place, for use as an upper bound.
+
+    Examples:
+        >>> fmt_f1_ceil(0.234)
+        '0.3'
+        >>> fmt_f1_ceil(-0.234)
+        '-0.2'
+    """
+    return _quantize(x, 1, ROUND_CEILING)
+
+
+def fmt_f2_ceil(x: float | None) -> str:
+    """Round up to 2 decimal places, for use as an upper bound.
+
+    Examples:
+        >>> fmt_f2_ceil(0.234)
+        '0.24'
+        >>> fmt_f2_ceil(0.23)
+        '0.23'
+    """
+    return _quantize(x, 2, ROUND_CEILING)
+
+
+def fmt_f3_ceil(x: float | None) -> str:
+    """Round up to 3 decimal places, for use as an upper bound.
+
+    Examples:
+        >>> fmt_f3_ceil(0.09092)
+        '0.091'
+    """
+    return _quantize(x, 3, ROUND_CEILING)
+
+
+def fmt_f0_floor(x: float | None) -> str:
+    """Round down to a whole number, for use as a lower bound.
+
+    Examples:
+        >>> fmt_f0_floor(42.9)
+        '42'
+    """
+    return _quantize(x, 0, ROUND_FLOOR)
+
+
+def fmt_f1_floor(x: float | None) -> str:
+    """Round down to 1 decimal place, for use as a lower bound.
+
+    Examples:
+        >>> fmt_f1_floor(0.3453)
+        '0.3'
+        >>> fmt_f1_floor(-0.234)
+        '-0.3'
+    """
+    return _quantize(x, 1, ROUND_FLOOR)
+
+
+def fmt_f2_floor(x: float | None) -> str:
+    """Round down to 2 decimal places, for use as a lower bound.
+
+    Examples:
+        >>> fmt_f2_floor(0.3453)
+        '0.34'
+        >>> fmt_f2_floor(0.23)
+        '0.23'
+    """
+    return _quantize(x, 2, ROUND_FLOOR)
+
+
+def fmt_f3_floor(x: float | None) -> str:
+    """Round down to 3 decimal places, for use as a lower bound.
+
+    Examples:
+        >>> fmt_f3_floor(0.09092)
+        '0.090'
+    """
+    return _quantize(x, 3, ROUND_FLOOR)
+
+
+# ---------------------------------------------------------------------------
 # Registry
 # ---------------------------------------------------------------------------
 
@@ -467,6 +594,16 @@ FORMATTERS: dict[str, Callable] = {
     "f1": fmt_f1,
     "f2": fmt_f2,
     "f3": fmt_f3,
+    # Bound-safe variants -- round away from the data so the rendered bound is
+    # never contradicted by the value it came from.
+    "f0ceil": fmt_f0_ceil,
+    "f1ceil": fmt_f1_ceil,
+    "f2ceil": fmt_f2_ceil,
+    "f3ceil": fmt_f3_ceil,
+    "f0floor": fmt_f0_floor,
+    "f1floor": fmt_f1_floor,
+    "f2floor": fmt_f2_floor,
+    "f3floor": fmt_f3_floor,
     "min": fmt_min,
     "hr": fmt_hr,
     "raw": fmt_raw,

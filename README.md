@@ -323,6 +323,8 @@ Then read the new warnings as a to-do list. Three things to know:
 | `f1` | `fmt1`, `float1` | `12.345` | `12.3` | 1 decimal place |
 | `f2` | `fmt2`, `float2` | `12.345` | `12.35` | 2 decimal places |
 | `f3` | `fmt3`, `float3` | `12.3456` | `12.346` | 3 decimal places |
+| `f0ceil` … `f3ceil` | | `0.234` | `0.24` (`f2ceil`) | Rounds **up** — for an upper bound |
+| `f0floor` … `f3floor` | | `0.3453` | `0.34` (`f2floor`) | Rounds **down** — for a lower bound |
 | `r` | | `-0.456` | `−0.46` | Signed, 2 decimals, Unicode/ASCII minus |
 | `p` | | `0.0234` | `0.023` | APA p-value; strips trailing zeros |
 | `p` | | `3.8e-4` | `3.8×10⁻⁴` | Scientific notation (Unicode or LaTeX) |
@@ -332,6 +334,28 @@ Then read the new warnings as a to-do list. Three things to know:
 | `min` | | `150` | `2.5 min` | Seconds → minutes |
 | `hr` | | `5400` | `1.5 hr` | Seconds → hours |
 | `raw` | | `anything` | `anything` | Default when no formatter given |
+
+### Rounding a bound
+
+`f0`–`f3` round to nearest, which is correct for reporting a value and wrong for
+reporting a bound. A bound must round *away* from the data, or the value that
+defines it ends up contradicting it:
+
+| Template | Value | Renders | True? |
+|---|---|---|---|
+| `max \|d\| < {{k:f1}}` | 0.234 | `max \|d\| < 0.2` | **no** — 0.234 > 0.2 |
+| `max \|d\| < {{k:f1ceil}}` | 0.234 | `max \|d\| < 0.3` | yes |
+| `all p > {{k:f2}}` | 0.3453 | `all p > 0.35` | **no** — 0.3453 < 0.35 |
+| `all p > {{k:f2floor}}` | 0.3453 | `all p > 0.34` | yes |
+
+Use `:Nceil` whenever the placeholder sits after `<` or `≤`, and `:Nfloor` after
+`>` or `≥` — including the two ends of a range. Ceil means larger and floor means
+smaller for negative values too, so `{{k:f2ceil}}` on −0.5203 gives `−0.52`.
+
+Note that this fixes the *rounding*; it cannot tell you that you wired the wrong
+key. `all p < {{ctrl.total_sleep_p:p}}` renders a real value of a real key and is
+still false if a sibling p-value exceeds it. Wiring a bound means wiring the
+extreme of the family it quantifies over.
 
 ### Render Modes
 

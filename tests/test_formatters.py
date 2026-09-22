@@ -7,9 +7,17 @@ import pytest
 from paper_forge.formatters import (
     FORMATTERS,
     fmt_f0,
+    fmt_f0_ceil,
+    fmt_f0_floor,
     fmt_f1,
+    fmt_f1_ceil,
+    fmt_f1_floor,
     fmt_f2,
+    fmt_f2_ceil,
+    fmt_f2_floor,
     fmt_f3,
+    fmt_f3_ceil,
+    fmt_f3_floor,
     fmt_hr,
     fmt_int,
     fmt_min,
@@ -574,3 +582,97 @@ class TestFormatterStateIsolation:
 
     def test_b_sees_the_default_again(self):
         assert fmt_r(0.029) == "+0.03"
+
+
+class TestDirectionalRounding:
+    """Tests for the bound-safe ceil/floor formatters.
+
+    Round-to-nearest is correct for reporting a value and wrong for reporting a
+    bound: it moves toward the nearest gridpoint, which is the wrong direction
+    roughly half the time. These formatters always move away from the data, so
+    the rendered bound is never contradicted by the value it came from.
+    """
+
+    def test_ceil_never_below_the_value(self):
+        # max_d = 0.234 written as "max |d| < {x}" must not render 0.2
+        assert fmt_f1_ceil(0.234) == "0.3"
+        assert fmt_f2_ceil(0.234) == "0.24"
+
+    def test_floor_never_above_the_value(self):
+        # chi2 minimum 0.3453 written as "all p > {x}" must not render 0.35
+        assert fmt_f2_floor(0.3453) == "0.34"
+        assert fmt_f1_floor(0.3453) == "0.3"
+
+    def test_round_to_nearest_would_have_flipped_these(self):
+        # Both directions of the failure, side by side with the unsafe formatter.
+        assert fmt_f1(0.234) == "0.2"  # unsafe: below the true max
+        assert fmt_f1_ceil(0.234) == "0.3"  # safe
+        assert fmt_f2(0.3453) == "0.35"  # unsafe: above the true min
+        assert fmt_f2_floor(0.3453) == "0.34"  # safe
+
+    def test_exact_values_are_not_pushed_to_the_next_gridpoint(self):
+        # 0.23 is not exactly representable as a float; a naive scale-and-ceil
+        # renders 0.24. The bound must stay on the value when it already sits
+        # exactly on the target precision.
+        assert fmt_f2_ceil(0.23) == "0.23"
+        assert fmt_f2_floor(0.23) == "0.23"
+        assert fmt_f1_ceil(0.5) == "0.5"
+        assert fmt_f1_floor(0.5) == "0.5"
+        assert fmt_f0_ceil(42.0) == "42"
+        assert fmt_f0_floor(42.0) == "42"
+
+    def test_negative_values_round_along_the_number_line(self):
+        # "partial rho < {x}" for rho = -0.5203: the upper bound is -0.52,
+        # not -0.53. Ceil means larger, floor means smaller, for both signs.
+        assert fmt_f2_ceil(-0.5203) == "-0.52"
+        assert fmt_f2_floor(-0.5203) == "-0.53"
+        assert fmt_f1_ceil(-0.234) == "-0.2"
+        assert fmt_f1_floor(-0.234) == "-0.3"
+
+    def test_ceil_is_an_upper_bound_and_floor_a_lower_bound(self):
+        values = [0.0, 0.234, 0.3453, 0.5, 1.0, 42.7, -0.5203, -0.234, -12.345]
+        for v in values:
+            for ceil_fn, floor_fn in (
+                (fmt_f0_ceil, fmt_f0_floor),
+                (fmt_f1_ceil, fmt_f1_floor),
+                (fmt_f2_ceil, fmt_f2_floor),
+                (fmt_f3_ceil, fmt_f3_floor),
+            ):
+                assert float(ceil_fn(v)) >= v, f"{ceil_fn.__name__}({v})"
+                assert float(floor_fn(v)) <= v, f"{floor_fn.__name__}({v})"
+
+    def test_three_decimal_variants(self):
+        assert fmt_f3_ceil(0.09092) == "0.091"
+        assert fmt_f3_floor(0.09092) == "0.090"
+
+    def test_zero_decimal_variants(self):
+        assert fmt_f0_ceil(42.1) == "43"
+        assert fmt_f0_floor(42.9) == "42"
+
+    def test_missing_values(self):
+        for fn in (
+            fmt_f0_ceil,
+            fmt_f1_ceil,
+            fmt_f2_ceil,
+            fmt_f3_ceil,
+            fmt_f0_floor,
+            fmt_f1_floor,
+            fmt_f2_floor,
+            fmt_f3_floor,
+        ):
+            assert fn(None) == "N/A"
+
+    def test_registered_under_template_names(self):
+        for name in (
+            "f0ceil",
+            "f1ceil",
+            "f2ceil",
+            "f3ceil",
+            "f0floor",
+            "f1floor",
+            "f2floor",
+            "f3floor",
+        ):
+            assert name in FORMATTERS
+        assert FORMATTERS["f2ceil"](0.234) == "0.24"
+        assert FORMATTERS["f2floor"](0.3453) == "0.34"

@@ -155,6 +155,24 @@ reads well when significant and garbles when null is not finished.
 
 Numbers → `{{prefix.key:formatter}}`. Verdicts → `{{interp.key}}`.
 
+### A bound is a claim, not a number
+
+When a placeholder sits next to `<`, `>`, `≤`, `≥`, or at either end of a range, you
+are not reporting a value — you are asserting that no data point falls outside it.
+Two things have to be right.
+
+**Wire the extreme, not a member.** `all p < {{ctrl.total_sleep_p:p}}` is false the
+moment a sibling p-value exceeds it. Wire the max of the family (a `derived:` key with
+`max(...)` if none exists), not whichever key you happened to be looking at.
+
+**Round away from the data.** `f0`–`f3` round to nearest and will silently flip the
+claim: `max |d| < {{k:f1}}` on 0.234 renders `< 0.2`, and `all p > {{k:f2}}` on 0.3453
+renders `> 0.35`. Both are contradicted by the value they came from. Use `:Nceil`
+after `<` / `≤` and `:Nfloor` after `>` / `≥`.
+
+`gate` cannot catch either mistake — the number is correctly wired and correctly
+rendered, so only the surrounding sentence is wrong.
+
 ### Coverage is the requirement
 
 A verdict is stated in **more than one place**. A finding typically appears in the
@@ -286,6 +304,7 @@ them, and add the pattern to `claims.extra_patterns` so it is caught next time.
 - [ ] Every claim traces to exactly one RQ
 - [ ] Every verdict resolves through `{{interp.*}}` — including abstract, captions, title
 - [ ] Every number resolves through `{{prefix.key:formatter}}`
+- [ ] Every bound wires the extreme of its family and uses `:Nceil` / `:Nfloor`
 - [ ] No result unit states a verdict — rules engine only (frozen-verdict guard checks this)
 - [ ] `paper-forge gate` passes
 - [ ] Verdict-flip test done: all branches read as grammatical English
