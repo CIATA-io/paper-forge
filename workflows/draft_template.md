@@ -248,6 +248,17 @@ Reaching for an allow-comment on a claim about *your own* results means the sent
 an interpretation rule instead. Recurring exceptions belong in `project.yaml`
 (`literals.allow`, `claims.allow`, `citations.allow`) with a comment saying why.
 
+Then confirm you changed where the numbers come from, not what they say:
+
+```bash
+paper-forge baseline          # every number must still match the manuscript as adopted
+```
+
+An empty result is the point: it says the slots you wired reproduce the paper exactly as
+it read before. The guards prove a claim is *wired*; the baseline proves wiring it did not
+rewrite the paper. When a number changes because you meant it to, re-record with
+`paper-forge baseline --record` and say so — that is the moment the content actually moved.
+
 Then read the compiled output as prose:
 
 ```bash

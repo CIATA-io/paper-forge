@@ -723,6 +723,16 @@ result_units:
 # Where the research-question registry lives (default shown).
 research_questions: "manuscript/research_questions.md"
 
+# Numeric house style (optional; defaults shown). Defaults reproduce paper-forge's
+# standard output, so omitting this section changes nothing.
+formatting:
+  r_decimals: 2          # decimals for :r. Use 3 when small effects matter — at two,
+                         # r = 0.029 and r = 0.035 both print "+0.03".
+  p_small_sig_figs: null # sig figs for p in [0.001, 0.01). null keeps the 3-decimal
+                         # path, which renders 0.0096 as "0.01" (reads as p >= 0.01).
+  p_clamp_exp: null      # print "< 10^-N" below 10**-N. Set 300 where a p-value hits
+                         # the float64 denormal floor and its digits mean nothing.
+
 # Numeric-literal guard (optional; defaults shown).
 literals:
   enforce: false          # true = hardcoded literals fail `check` (like --strict-literals)

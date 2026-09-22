@@ -224,6 +224,33 @@ you'll get `++0.32`. Use one or the other:
 - ✅ `$r = {{stats.r:r}}$` → `$r = +0.32$`
 - ❌ `$r = +{{stats.r:r}}$` → `$r = ++0.32$`
 
+### Numeric House Style
+
+A paper already has conventions for how it prints numbers, and three of paper-forge's
+defaults are not universal. Declare yours in `project.yaml` under `formatting:`:
+
+```yaml
+formatting:
+  r_decimals: 3        # effect-size decimals (default 2)
+  p_small_sig_figs: 2  # sig figs for p in [0.001, 0.01) (default: 3-decimal path)
+  p_clamp_exp: 300     # print "< 10^-300" below that (default: no clamp)
+```
+
+Why each exists, from a real migration:
+
+- At two decimals `r = 0.029` and `r = 0.035` **both print `+0.03`**, erasing a distinction
+  a paper's argument may rest on; `0.096` also rounds to `+0.10`, reading as if it had
+  crossed the 0.1 threshold an interpretation rule branches on.
+- Three decimals on a p-value in `[0.001, 0.01)` costs a significant figure (`0.0062` ->
+  `0.006`) or rounds out of the band (`0.0096` -> `0.01`, which reads as p >= 0.01).
+  Significant figures, not decimals, because decimals cannot express it without a
+  band-specific decimal count — which is significant figures in disguise.
+- Below `10^-300` a p-value's mantissa is past the float64 denormal floor and carries no
+  information, so `< 10^-300` is the honest claim.
+
+Defaults reproduce the historical output exactly, so adding the section to an existing
+project changes nothing until you set a value.
+
 ### Render Modes
 
 paper-forge auto-detects whether to use Unicode or LaTeX formatting based on
@@ -249,6 +276,8 @@ make check-refs  # Cross-check citations against bibliography; report coverage
 make tokens      # Print the reference-token table (copy tokens from here)
 make verify-bib  # Record a .bib as human-verified (writes bibliography.lock)
 make pdf         # Render manuscript.md → manuscript.pdf
+paper-forge baseline          # Confirm no number moved unintentionally
+paper-forge baseline --record # Accept the current numbers as the new baseline
 make all         # compile + pdf
 make pipeline    # units + compile + pdf
 make test        # Run tests

@@ -51,6 +51,20 @@ citations:
   require_verified: false # true = citing an unverified .bib fails the gate
   allow: [] # regexes for '@'/\cite-shaped text that is not a citation
 
+# How this paper prints numbers. Every default reproduces paper-forge's standard
+# output, so omitting this section changes nothing. Set them when a paper's existing
+# conventions differ — wiring a number should change where it comes from, never what
+# it says.
+formatting:
+  r_decimals: 2 # decimals for :r. Use 3 when the argument turns on small effects:
+  #               at two decimals r = 0.029 and r = 0.035 both print "+0.03".
+  p_small_sig_figs: null # significant figures for p in [0.001, 0.01). null keeps the
+  #                        3-decimal path, which renders 0.0062 as "0.006" (one sig fig)
+  #                        and 0.0096 as "0.01" (reads as p >= 0.01). Set 2 to keep both.
+  p_clamp_exp: null # print "< 10^-N" below 10**-N instead of a mantissa. Set 300 when a
+  #                   p-value reaches the float64 denormal floor, where "3.3e-303" is
+  #                   false precision. Must be in [3, 300].
+
 execution:
   python: "uv run python"
 
