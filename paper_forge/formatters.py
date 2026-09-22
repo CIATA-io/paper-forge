@@ -85,9 +85,7 @@ def set_formatter_config(config: FormatterConfig) -> None:
     if config.r_decimals < 0 or config.r_decimals > 10:
         raise ValueError(f"r_decimals must be in [0, 10], got {config.r_decimals}")
     if config.p_small_sig_figs is not None and not (1 <= config.p_small_sig_figs <= 10):
-        raise ValueError(
-            f"p_small_sig_figs must be in [1, 10], got {config.p_small_sig_figs}"
-        )
+        raise ValueError(f"p_small_sig_figs must be in [1, 10], got {config.p_small_sig_figs}")
     if config.p_clamp_exp is not None and not (3 <= config.p_clamp_exp <= 300):
         raise ValueError(f"p_clamp_exp must be in [3, 300], got {config.p_clamp_exp}")
     global _FMT_CONFIG

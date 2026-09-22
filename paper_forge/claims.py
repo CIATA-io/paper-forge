@@ -123,7 +123,7 @@ _INLINE_PROTECTED: tuple[re.Pattern[str], ...] = (
 # "Smith and Jones" and silently exempt real verdicts from the guard.
 _CITATION = re.compile(
     r"\[\s*\d+(?:\s*[,–-]\s*\d+)*\s*\]"  # [12], [1, 2], [3-5]
-    r"|\b[A-Z][A-Za-z'’-]+\s+(?:et\s+al\.?|and\s+[A-Z][A-Za-z'’-]+)"  # Klein et al. / Smith and Jones
+    r"|\b[A-Z][A-Za-z'’-]+\s+(?:et\s+al\.?|and\s+[A-Z][A-Za-z'’-]+)"  # Klein et al. / Smith and J.
     r"|\(\s*[A-Z][A-Za-z'’-]+[^)]*?(?:19|20)\d\d[a-z]?\s*\)"  # (von Frisch 1967)
     r"|\b[A-Z][A-Za-z'’-]+\s+\(\s*(?:19|20)\d\d[a-z]?\s*\)"  # Frisch (1967)
 )

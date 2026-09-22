@@ -425,12 +425,10 @@ class TestRenderMode:
 # Defaults must reproduce the historical output exactly; a project opts in via a
 # `formatting:` section. The cases below are the ones a migration actually turns on.
 
-import pytest  # noqa: E402
 
 from paper_forge.formatters import (  # noqa: E402
     FormatterConfig,
     set_formatter_config,
-    set_render_mode,
 )
 
 

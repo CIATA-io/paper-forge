@@ -188,6 +188,8 @@ def test_methods_rq_accepted(tmp_path):
 
 from paper_forge.research_questions import (  # noqa: E402
     check_rq_lifecycle,
+)
+from paper_forge.research_questions import (  # noqa: E402  (grouped with its test block)
     parse_registry as _parse,
 )
 
@@ -339,9 +341,7 @@ def test_headline_rq_without_anchor_is_flagged(tmp_path):
 
 
 def test_dropped_rq_anchored_in_manuscript_is_flagged(tmp_path):
-    reg = _registry(
-        "## RQ1 — T\n- **question:** q?\n- **status:** dropped\n", tmp_path
-    )
+    reg = _registry("## RQ1 — T\n- **question:** q?\n- **status:** dropped\n", tmp_path)
     findings = check_rq_lifecycle(reg, {}, template_text=MANUSCRIPT)
     assert [f.kind for f in findings] == ["dropped-in-manuscript"]
 
@@ -353,7 +353,9 @@ from paper_forge.research_questions import evidence_delta  # noqa: E402
 
 def _one(body, old, new, **kw):
     """Parse a one-RQ registry and return the single delta for its evidence keys."""
-    import tempfile, pathlib
+    import pathlib
+    import tempfile
+
     d = pathlib.Path(tempfile.mkdtemp())
     (d / "rq.md").write_text(body, encoding="utf-8")
     reg = _parse(d / "rq.md")
@@ -429,6 +431,9 @@ def test_unchanged_keys_are_omitted():
 
 
 def test_float_noise_is_not_a_change():
-    d = _one(HEADLINE, {"a.eff_r": 0.400000000000, "a.main_p": 0.01},
-             {"a.eff_r": 0.4000000000001, "a.main_p": 0.01})
+    d = _one(
+        HEADLINE,
+        {"a.eff_r": 0.400000000000, "a.main_p": 0.01},
+        {"a.eff_r": 0.4000000000001, "a.main_p": 0.01},
+    )
     assert d == []

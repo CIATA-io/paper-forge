@@ -27,7 +27,7 @@ its placeholder prefix::
     derived:
       # Reference other results via results['prefix.key'] (dotted keys are not
       # valid identifiers); bare names work for identifier-safe and prior derived keys.
-      pcorr.forage_dance_ratio: "abs(results['pcorr.partial_forage_rho'] / results['pcorr.partial_dance_rho'])"
+      pcorr.ratio: "abs(results['pcorr.forage_rho'] / results['pcorr.dance_rho'])"
 """
 
 from __future__ import annotations
@@ -46,6 +46,11 @@ from paper_forge.formatters import (
     set_formatter_config,
     set_render_mode,
 )
+from paper_forge.interpretation import InterpretationEngine, load_function_plugin
+from paper_forge.result_unit import load_results
+
+# Regex matching {{prefix.key:formatter}} or {{prefix.key}}
+_PLACEHOLDER_RE = re.compile(r"\{\{([^{}]+)\}\}")
 
 
 def _optional_int(value: Any) -> int | None:
@@ -53,11 +58,7 @@ def _optional_int(value: Any) -> int | None:
     if value is None or (isinstance(value, str) and value.strip().lower() in ("", "null")):
         return None
     return int(value)
-from paper_forge.interpretation import InterpretationEngine, load_function_plugin
-from paper_forge.result_unit import load_results
 
-# Regex matching {{prefix.key:formatter}} or {{prefix.key}}
-_PLACEHOLDER_RE = re.compile(r"\{\{([^{}]+)\}\}")
 
 # `<!-- pf-allow-literal: ... -->` are guard directives for the numeric-literal
 # checker (see paper_forge.literals), not manuscript content — strip them (and any

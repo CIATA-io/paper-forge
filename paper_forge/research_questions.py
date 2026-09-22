@@ -305,7 +305,8 @@ def check_rq_lifecycle(
             findings.append(
                 RqFinding(
                     "bad-role",
-                    f"RQ '{rq.id}' has invalid role '{rq.role}' (use: {', '.join(sorted(VALID_ROLES))})",
+                    f"RQ '{rq.id}' has invalid role '{rq.role}' "
+                    f"(use: {', '.join(sorted(VALID_ROLES))})",
                 )
             )
 
@@ -364,7 +365,8 @@ def check_rq_lifecycle(
                 findings.append(
                     RqFinding(
                         "dropped-in-manuscript",
-                        f"RQ '{rq.id}' is dropped but is still anchored in the manuscript — remove it.",
+                        f"RQ '{rq.id}' is dropped but is still anchored in the "
+                        "manuscript — remove it.",
                     )
                 )
             elif rq.role == "future_work" and rq.id in intro_ids:
@@ -515,7 +517,8 @@ def _classify_delta(
         if crosses:
             cls, reason = tier(f"p-value crossed alpha ({old:.4g}→{new:.4g})")
             return rel_delta, sign_flip, True, cls, reason
-        return rel_delta, sign_flip, False, "notification", "p-value moved but stayed the same side of alpha"
+        reason = "p-value moved but stayed the same side of alpha"
+        return rel_delta, sign_flip, False, "notification", reason
 
     if kind == "effect":
         if old_zero and not new_zero:
@@ -525,14 +528,17 @@ def _classify_delta(
             cls, reason = tier(f"effect direction reversed ({old:.4g}→{new:.4g})")
             return rel_delta, sign_flip, False, cls, reason
         if rel_delta is not None and rel_delta >= mag_threshold:
-            cls, reason = tier(f"effect magnitude shifted {rel_delta * 100:.0f}% ({old:.4g}→{new:.4g})")
+            cls, reason = tier(
+                f"effect magnitude shifted {rel_delta * 100:.0f}% ({old:.4g}→{new:.4g})"
+            )
             return rel_delta, sign_flip, False, cls, reason
         return rel_delta, sign_flip, False, "notification", "effect change within tolerance"
 
     # "other" keys (counts, medians, …): not verdict inputs. A large move on a headline
     # one is worth a look but is never on its own a halt.
     if role == "headline" and rel_delta is not None and rel_delta >= mag_threshold:
-        return rel_delta, sign_flip, False, "decision", f"headline quantity moved {rel_delta * 100:.0f}%"
+        reason = f"headline quantity moved {rel_delta * 100:.0f}%"
+        return rel_delta, sign_flip, False, "decision", reason
     return rel_delta, sign_flip, False, "notification", "non-verdict quantity change"
 
 

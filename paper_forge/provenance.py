@@ -14,7 +14,6 @@ import sys
 from pathlib import Path
 from typing import Any
 
-
 GIT_VERSION_FILE = ".git_version"
 
 
